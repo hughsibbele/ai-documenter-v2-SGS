@@ -1,6 +1,6 @@
 # AI Documenter v2 — Planning Notes
 
-**Status:** see [`../BUILD_PLAN.md`](../BUILD_PLAN.md) for ecosystem-wide milestones and current state. This file is local navigation for the AI Documenter codebase.
+**Status:** see [`../BUILD_PLAN.md`](../BUILD_PLAN.md) ([on GitHub](https://github.com/hughsibbele/super-grader-suite/blob/main/BUILD_PLAN.md)) for ecosystem-wide milestones and current state. This file is local navigation for the AI Documenter codebase.
 
 ## What it is
 
