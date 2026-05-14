@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* EHS brand tokens — mirror the values in
+ * .claude/projects/.../memory/feedback_ehs_brand_style.md and the school's
+ * style guide. Anything student-facing should pull from these utilities. */
+@theme {
+  --color-maroon: #7a1e46;
+  --color-maroon-dark: #5a1535;
+  --color-cool-gray: #54565b;
+  --color-light-blue: #c4dceb;
+  --color-dark-blue: #006890;
+  --color-dark-blue-dark: #004f6e;
+  --color-paper: #fafaf7;
+  --color-ink: #1a1a1a;
+
+  /* Display (headings) + body both Lora-first. Loaded via next/font/google
+   * in the root layout under --font-lora; Georgia is the web-safe fallback. */
+  --font-display: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-lora), Georgia, "Times New Roman", serif;
+  /* Reserved for "official document" surfaces (the static prompt block, the
+   * locked first draft) — explicit Georgia gives those a distinct, slightly
+   * heavier, traditional feel against the Lora-running body. */
+  --font-document: Georgia, "Times New Roman", serif;
+}
+
+:root {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-feature-settings: "kern", "liga", "calt";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Editorial-feel ornaments. Sparingly used — section breaks, hairline
+ * accents, drop-cap support if it ever shows up. */
+.ehs-rule {
+  display: block;
+  height: 1px;
+  background: var(--color-light-blue);
+  border: 0;
+}
+.ehs-rule-maroon {
+  display: block;
+  height: 2px;
+  background: var(--color-maroon);
+  border: 0;
+}
+
+/* Small-caps eyebrow utility — used on metadata strips ("AI USE REFLECTION ·
+ * REQUIRED FOR CREDIT") across student + dashboard + admin surfaces. */
+.ehs-eyebrow {
+  font-family: var(--font-document);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-cool-gray);
+}
+
+/* Focus rings — maroon at 50% opacity, no blue browser default. */
+*:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--color-maroon) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
