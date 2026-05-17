@@ -86,14 +86,17 @@ async function runForAssignments(
     }
   }
 
-  // `NEXT_PUBLIC_STUDENT_FORM_URL` is the app origin where the standalone
-  // reflection lives. Name is historical (the iframe-era student-form host);
-  // after M1 it's the merged teacher-admin app, which also hosts /r/<token>.
-  const appBaseUrl = process.env.NEXT_PUBLIC_STUDENT_FORM_URL;
+  // `NEXT_PUBLIC_APP_URL` is the app origin where the standalone reflection
+  // lives (and now everything else — pre-M1 there were two apps; post-merge
+  // there's just one). M4.3 transition: fall back to the legacy
+  // `NEXT_PUBLIC_STUDENT_FORM_URL` name for one cycle so the rename can be
+  // staged across code → Vercel → drop-fallback without a forced window.
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_STUDENT_FORM_URL;
   if (op === "install" && !appBaseUrl) {
     return failAll(
       canvasAssignmentIds,
-      "NEXT_PUBLIC_STUDENT_FORM_URL is not set; cannot build reflection URL",
+      "NEXT_PUBLIC_APP_URL (or legacy NEXT_PUBLIC_STUDENT_FORM_URL) is not set; cannot build reflection URL",
     );
   }
 

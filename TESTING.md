@@ -56,7 +56,7 @@ Block testing if anything here fails — the rest is meaningless without a healt
   - **Crypto + salt**: `CANVAS_TOKEN_ENC_KEY`, `SUPER_GRADER_SALT` (must equal super-grader's value exactly)
   - **Admin bootstrap**: `INITIAL_ADMIN_EMAIL`, `ADMIN_EMAIL_DOMAIN`
   - **Cron**: `CRON_SECRET`
-  - **Student form URL**: `NEXT_PUBLIC_STUDENT_FORM_URL` (must be set — without it the webhook skips and `/api/super-grader/result` returns 500)
+  - **App URL**: `NEXT_PUBLIC_APP_URL` (must be set — without it the webhook skips and `/api/super-grader/result` returns 500). During M4.3 transition the legacy name `NEXT_PUBLIC_STUDENT_FORM_URL` is still accepted as a fallback; setting either works.
   - **Gemini**: `GEMINI_API_KEY`, optional `GEMINI_MODEL`, optional `GEMINI_DEFAULT_DAILY_CAP`
   - **Super-grader peer**: `SUPER_GRADER_API_URL`, `SUPER_GRADER_INGEST_TOKEN`, `AI_DOCUMENTER_API_TOKEN`
   - **Sentry (optional)**: `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`

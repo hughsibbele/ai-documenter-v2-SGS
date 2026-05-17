@@ -38,7 +38,10 @@ export async function notifySuperGrader(args: {
 }): Promise<NotifyResult> {
   const baseUrl = process.env.SUPER_GRADER_API_URL?.replace(/\/$/, "");
   const token = process.env.SUPER_GRADER_INGEST_TOKEN;
-  const appUrl = process.env.NEXT_PUBLIC_STUDENT_FORM_URL?.replace(/\/$/, "");
+  // M4.3 transition: prefer NEXT_PUBLIC_APP_URL; fall back to legacy name.
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_STUDENT_FORM_URL
+  )?.replace(/\/$/, "");
 
   if (!baseUrl || !token) {
     return {
@@ -57,7 +60,7 @@ export async function notifySuperGrader(args: {
     return {
       ok: false,
       error:
-        "NEXT_PUBLIC_STUDENT_FORM_URL not set — webhook skipped (super-grader requires a detail_url).",
+        "NEXT_PUBLIC_APP_URL (or legacy NEXT_PUBLIC_STUDENT_FORM_URL) not set — webhook skipped (super-grader requires a detail_url).",
       skipped: true,
     };
   }

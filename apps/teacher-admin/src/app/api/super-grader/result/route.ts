@@ -127,7 +127,12 @@ export async function GET(request: Request): Promise<Response> {
     (t) => t.id === session.teacher_assignment_id,
   );
 
-  const appUrl = process.env.NEXT_PUBLIC_STUDENT_FORM_URL?.replace(/\/$/, "");
+  // M4.3 transition: prefer NEXT_PUBLIC_APP_URL; fall back to the legacy
+  // NEXT_PUBLIC_STUDENT_FORM_URL name for one cycle. Drop the fallback once
+  // every deploy environment has been migrated.
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_STUDENT_FORM_URL
+  )?.replace(/\/$/, "");
   if (!appUrl || !ta) {
     // Super-grader's validatePeerEnvelope rejects an empty links.detail_url.
     // Better to surface "AI Documenter misconfigured" as a 500 than silently
@@ -135,7 +140,7 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json(
       {
         error:
-          "NEXT_PUBLIC_STUDENT_FORM_URL is not configured on this deploy; cannot build a valid detail_url.",
+          "NEXT_PUBLIC_APP_URL (or legacy NEXT_PUBLIC_STUDENT_FORM_URL) is not configured on this deploy; cannot build a valid detail_url.",
       },
       { status: 500 },
     );

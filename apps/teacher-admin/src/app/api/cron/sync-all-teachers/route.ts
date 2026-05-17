@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const appBaseUrl = process.env.NEXT_PUBLIC_STUDENT_FORM_URL;
+  // M4.3 transition: prefer NEXT_PUBLIC_APP_URL; fall back to legacy name.
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_STUDENT_FORM_URL;
 
   const admin = createAdminDbClient();
   const { data: teachers, error } = await admin

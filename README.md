@@ -145,7 +145,8 @@ Set on the Vercel `ai-documenter-v2` project (Production + Preview):
 | `SUPER_GRADER_SALT` | shared anon-token salt across the EHS ecosystem |
 | `INITIAL_ADMIN_EMAIL` + `ADMIN_EMAIL_DOMAIN` | admin self-bootstrap on first visit |
 | `CRON_SECRET` | bearer auth for `/api/cron/*` |
-| `NEXT_PUBLIC_STUDENT_FORM_URL` | `https://ai-documenter-v2-teacher-admin.vercel.app` — used by the install action to build the card's `href` + logo `src`. Name is historical (predates the merge). |
+| `NEXT_PUBLIC_APP_URL` | `https://ai-documenter-v2-teacher-admin.vercel.app` — used by the install action to build the card's `href` + logo `src`, and by the outbound super-grader webhook for `links.detail_url`. |
+| `NEXT_PUBLIC_STUDENT_FORM_URL` | Legacy name for the same value (predates the merge with student-form). Code reads `NEXT_PUBLIC_APP_URL` first and falls back to this for one cycle (M4.3 transition). Drop once every deploy environment has been migrated. |
 | `GEMINI_API_KEY` | Sensitive. Locally, Hugh's `~/.zshrc` exports it; Vercel needs it explicitly. |
 | `GEMINI_MODEL` | optional; defaults to `gemini-3-flash-preview` |
 | `SUPER_GRADER_API_URL` | `https://super-grader.vercel.app` — webhook target |
