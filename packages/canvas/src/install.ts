@@ -57,8 +57,7 @@ const SCHEMA_VERSION = 2;
 /**
  * Render the marker-wrapped EHS reflection card. Pure string concat — caller
  * is responsible for ensuring appBaseUrl is the right origin for the
- * environment (NEXT_PUBLIC_APP_URL in our app — legacy name
- * NEXT_PUBLIC_STUDENT_FORM_URL still read as fallback during M4.3 transition).
+ * environment (NEXT_PUBLIC_APP_URL in our app).
  *
  * Output goes into a Canvas assignment description, which is sanitized HTML.
  * We rely only on tags + inline styles Canvas's RCE permits: `div`, `img`,

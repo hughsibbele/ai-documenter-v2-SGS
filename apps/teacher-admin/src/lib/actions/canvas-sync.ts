@@ -17,9 +17,7 @@ export async function refreshCanvas(): Promise<void> {
   const teacher = await getCurrentTeacher();
   const sync = await syncTeacherCanvasData(teacher.id);
   if (sync.ok) {
-    // M4.3 transition: prefer NEXT_PUBLIC_APP_URL; fall back to legacy name.
-    const appBaseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_STUDENT_FORM_URL;
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (appBaseUrl) {
       await autoInstallNewAssignmentsForTeacher(teacher.id, appBaseUrl);
     }

@@ -56,7 +56,7 @@ Block testing if anything here fails — the rest is meaningless without a healt
   - **Crypto + salt**: `CANVAS_TOKEN_ENC_KEY`, `SUPER_GRADER_SALT` (must equal super-grader's value exactly)
   - **Admin bootstrap**: `INITIAL_ADMIN_EMAIL`, `ADMIN_EMAIL_DOMAIN`
   - **Cron**: `CRON_SECRET`
-  - **App URL**: `NEXT_PUBLIC_APP_URL` (must be set — without it the webhook skips and `/api/super-grader/result` returns 500). During M4.3 transition the legacy name `NEXT_PUBLIC_STUDENT_FORM_URL` is still accepted as a fallback; setting either works.
+  - **App URL**: `NEXT_PUBLIC_APP_URL` (must be set — without it the webhook skips and `/api/super-grader/result` returns 500).
   - **Gemini**: `GEMINI_API_KEY`, optional `GEMINI_MODEL`, optional `GEMINI_DEFAULT_DAILY_CAP`
   - **Super-grader peer**: `SUPER_GRADER_API_URL`, `SUPER_GRADER_INGEST_TOKEN`, `AI_DOCUMENTER_API_TOKEN`
   - **Sentry (optional)**: `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`
@@ -213,7 +213,7 @@ This is the riskiest surface — two peers must agree on shape and auth. Validat
 
 - [ ] Complete a fresh reflection (§3.4). Watch super-grader's `peer_results` table — a new row appears within ~3 sec, `peer='ai_documenter'`, payload JSON validates against `validatePeerEnvelope`.
 - [ ] Payload contains: `schema_version: 1`, `peer: 'ai_documenter'`, `canvas_user_id` (string), `canvas_assignment_id` (string), `anon_token` starting with `Student_`, ISO `completed_at`, non-empty `summary` object, **non-empty `links.detail_url`** (this is the part that 422s if the env var is missing).
-- [ ] `detail_url` points at `<NEXT_PUBLIC_STUDENT_FORM_URL>/dashboard/reviews/<courseId>/<assignmentId>#session-<id>`. Visit it → review card scrolls into view.
+- [ ] `detail_url` points at `<NEXT_PUBLIC_APP_URL>/dashboard/reviews/<courseId>/<assignmentId>#session-<id>`. Visit it → review card scrolls into view.
 - [ ] Webhook is fire-and-forget: a slow super-grader doesn't block the student flow. Simulate by temporarily setting `SUPER_GRADER_API_URL=https://example.invalid` → student still sees "Submitted to Canvas," server log shows the webhook error.
 
 ### 6.2 Pull-on-view (GET `/api/super-grader/result`)
@@ -350,7 +350,7 @@ Run these as queries (or scripted with the Supabase CLI). Treat any "RLS allowed
 
 - [ ] Unset `GEMINI_API_KEY` → student reflection fails at Gemini boundary with a clear "Couldn't generate the objective summary" message. State stays `in_progress`; student can retry after teacher fixes config.
 - [ ] Unset `SUPER_GRADER_INGEST_TOKEN` → webhook skips with `skipped: true`. Canvas auto-submit still happens; teacher review still works. Super-grader's pull-on-view picks up the result later.
-- [ ] Unset `NEXT_PUBLIC_STUDENT_FORM_URL` → webhook is skipped (we refuse to emit an invalid envelope per the §6.1 fix). `/api/super-grader/result` returns 500 with a clear error. **Don't deploy without this set.**
+- [ ] Unset `NEXT_PUBLIC_APP_URL` → webhook is skipped (we refuse to emit an invalid envelope per the §6.1 fix). `/api/super-grader/result` returns 500 with a clear error. **Don't deploy without this set.**
 - [ ] Unset `CRON_SECRET` → cron route returns 500 "CRON_SECRET not configured". Vercel cron headers still fail auth.
 - [ ] Unset `AI_DOCUMENTER_API_TOKEN` → both super-grader GET routes return 500 with "AI_DOCUMENTER_API_TOKEN is not configured on this deploy." Super-grader sees this as a config error, surfaces it in its admin view.
 - [ ] Drop the Supabase connection mid-flow → student-facing actions surface the error in the chatbot UI; finalize idempotently resumes on retry.
@@ -385,5 +385,5 @@ Flagged during 2026-05-12 student testing — not blocking, not fully diagnosed.
 
 ## Operational reminders
 
-- **`NEXT_PUBLIC_STUDENT_FORM_URL` must equal the live serving hostname**, currently `https://ai-documenter-v2-teacher-admin.vercel.app` (no trailing slash). Both the reflection card's logo `src` and the "Open reflection →" `href` are built from this env at install time. Changing it requires a redeploy *and* a re-install on any pre-existing assignment whose card was built against the old value. If a card 404s with Vercel's `DEPLOYMENT_NOT_FOUND`, this is the first place to look.
+- **`NEXT_PUBLIC_APP_URL` must equal the live serving hostname**, currently `https://ai-documenter-v2-teacher-admin.vercel.app` (no trailing slash). Both the reflection card's logo `src` and the "Open reflection →" `href` are built from this env at install time. Changing it requires a redeploy *and* a re-install on any pre-existing assignment whose card was built against the old value. If a card 404s with Vercel's `DEPLOYMENT_NOT_FOUND`, this is the first place to look.
 - **`NEXT_PUBLIC_*` env vars are build-time, not runtime.** Editing them on the Vercel dashboard does NOT take effect until the next `vercel deploy --prod`. Easy to forget when you've changed everything else and the bug doesn't go away.
