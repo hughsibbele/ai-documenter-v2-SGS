@@ -270,6 +270,20 @@ function buildErrorMessage(err: unknown): string {
 // Submission body composition.
 // Sanitization is server-side on Canvas's end, so we keep to a small set of
 // HTML elements + inline styles. No classes (Canvas may strip unknown ones).
+//
+// Canvas's RCE flattens raw <h3>/<h4> to barely-distinguishable text, so we
+// rely on explicit inline styles (color, size, weight, top margin) to carry
+// the visual hierarchy rather than the tag default. <hr> rules separate
+// major sections cleanly.
+
+const HEADING_STYLE =
+  "font-family:Georgia,'Times New Roman',serif;color:#7a1e46;font-size:17px;font-weight:bold;margin:24px 0 8px 0;";
+const TITLE_STYLE =
+  "font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;font-size:22px;font-weight:bold;margin:0 0 16px 0;";
+const RULE_STYLE =
+  "border:none;border-top:1px solid #d6d6d6;margin:24px 0;";
+const BODY_STYLE =
+  "font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;font-size:15px;line-height:1.6;margin:0 0 12px 0;";
 
 export function buildSubmissionBody(args: {
   iframeToken: string;
@@ -287,31 +301,36 @@ export function buildSubmissionBody(args: {
     `<!-- ai-documenter:reflection v=1 iframe-token=${escapeMarkerToken(args.iframeToken)} -->`,
   );
 
-  parts.push("<h3>AI Use Reflection</h3>");
+  parts.push(`<h3 style="${TITLE_STYLE}">AI Use Reflection</h3>`);
 
   const chatRows = args.aiChats.filter((c) => c.url);
   if (chatRows.length > 0) {
-    parts.push("<h4>AI conversation(s)</h4>");
-    parts.push("<ul>");
+    parts.push(`<h4 style="${HEADING_STYLE}">AI conversation(s)</h4>`);
+    parts.push('<ul style="margin:0 0 12px 0;padding-left:24px;">');
     for (const c of chatRows) {
       const url = escapeHtmlAttr(c.url);
       parts.push(
-        `  <li>${capitalize(c.tool)}: <a href="${url}">${url}</a></li>`,
+        `  <li style="${BODY_STYLE}margin-bottom:6px;"><strong>${capitalize(c.tool)}:</strong> <a href="${url}">${url}</a></li>`,
       );
     }
     parts.push("</ul>");
   }
 
-  parts.push("<h4>First-draft reflection</h4>");
-  parts.push(`<div>${textToParagraphs(args.firstDraft)}</div>`);
+  parts.push(`<hr style="${RULE_STYLE}" />`);
+  parts.push(`<h4 style="${HEADING_STYLE}">First-draft reflection</h4>`);
+  parts.push(textToStyledParagraphs(args.firstDraft));
 
   if (args.objectiveSummary.trim()) {
-    parts.push("<h4>Objective summary of AI use</h4>");
-    parts.push(`<div>${textToParagraphs(args.objectiveSummary)}</div>`);
+    parts.push(`<hr style="${RULE_STYLE}" />`);
+    parts.push(
+      `<h4 style="${HEADING_STYLE}">Objective summary of AI use</h4>`,
+    );
+    parts.push(textToStyledParagraphs(args.objectiveSummary));
   }
 
   if (args.reflectionMessages.length > 0) {
-    parts.push("<h4>Reflection conversation</h4>");
+    parts.push(`<hr style="${RULE_STYLE}" />`);
+    parts.push(`<h4 style="${HEADING_STYLE}">Reflection conversation</h4>`);
     let qNumber = 0;
     let pendingAi: ReflectionMessage | null = null;
     const rendered: string[] = [];
@@ -338,9 +357,10 @@ export function buildSubmissionBody(args: {
   }
 
   if (args.pasteFallback.trim().length > 0) {
-    parts.push("<h4>AI conversation (pasted)</h4>");
+    parts.push(`<hr style="${RULE_STYLE}" />`);
+    parts.push(`<h4 style="${HEADING_STYLE}">AI conversation (pasted)</h4>`);
     parts.push(
-      `<pre style="white-space:pre-wrap;font-family:Georgia,serif;">${escapeHtml(args.pasteFallback)}</pre>`,
+      `<pre style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.5;color:#1a1a1a;background:#f7f7f7;padding:12px;border-radius:3px;margin:0;">${escapeHtml(args.pasteFallback)}</pre>`,
     );
   }
 
@@ -353,12 +373,29 @@ function renderTurn(
   student: ReflectionMessage | null,
 ): string {
   const out: string[] = [];
-  out.push(`<p><strong>Q${qNumber}.</strong> ${escapeHtml(ai.text)}</p>`);
+  out.push(
+    `<p style="${BODY_STYLE}margin-top:16px;"><strong style="color:#7a1e46;">Q${qNumber}.</strong> ${escapeHtml(ai.text)}</p>`,
+  );
   if (student) {
-    // textToParagraphs emits one or more <p> blocks; don't wrap them again.
-    out.push(textToParagraphs(student.text));
+    out.push(textToStyledParagraphs(student.text));
   }
   return out.join("\n");
+}
+
+// Styled paragraph wrapper for body content — applies BODY_STYLE so Canvas's
+// flattened defaults don't squash the rendering. Same shape as
+// textToParagraphs (one or more <p> blocks, <br> for single newlines) but
+// every <p> carries inline styles for color/size/leading.
+function textToStyledParagraphs(s: string): string {
+  const trimmed = s.trim();
+  if (!trimmed) return "";
+  return trimmed
+    .split(/\n\s*\n/)
+    .map(
+      (p) =>
+        `<p style="${BODY_STYLE}">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -385,43 +422,58 @@ function buildSubmissionBodyText(args: {
 }): string {
   void args.iframeToken; // intentionally unused in the plain-text path
   const parts: string[] = [];
+
+  // Title with rule below for visual weight in Canvas's monospace-ish comment
+  // rendering. Section headers get the same treatment: ALL CAPS + dash rule
+  // + blank line on both sides so the eye finds them quickly.
   parts.push("AI USE REFLECTION");
+  parts.push("=================");
 
   const chatRows = args.aiChats.filter((c) => c.url);
   if (chatRows.length > 0) {
     parts.push("");
-    parts.push("AI CONVERSATION(S)");
+    parts.push("");
+    parts.push(sectionHeader("AI conversation(s)"));
+    parts.push("");
     for (const c of chatRows) {
-      parts.push(`${capitalize(c.tool)}: ${c.url}`);
+      parts.push(`  • ${capitalize(c.tool)}: ${c.url}`);
     }
   }
 
   parts.push("");
-  parts.push("FIRST-DRAFT REFLECTION");
+  parts.push("");
+  parts.push(sectionHeader("First-draft reflection"));
+  parts.push("");
   parts.push(args.firstDraft.trim() || "(none submitted)");
 
   if (args.objectiveSummary.trim()) {
     parts.push("");
-    parts.push("OBJECTIVE SUMMARY OF AI USE");
+    parts.push("");
+    parts.push(sectionHeader("Objective summary of AI use"));
+    parts.push("");
     parts.push(args.objectiveSummary.trim());
   }
 
   if (args.reflectionMessages.length > 0) {
     parts.push("");
-    parts.push("REFLECTION CONVERSATION");
+    parts.push("");
+    parts.push(sectionHeader("Reflection conversation"));
     let qNumber = 0;
     let pendingAi: ReflectionMessage | null = null;
     for (const m of args.reflectionMessages) {
       if (m.role === "ai") {
         if (pendingAi) {
           qNumber += 1;
+          parts.push("");
           parts.push(`Q${qNumber}. ${pendingAi.text.trim()}`);
         }
         pendingAi = m;
       } else {
         if (pendingAi) {
           qNumber += 1;
+          parts.push("");
           parts.push(`Q${qNumber}. ${pendingAi.text.trim()}`);
+          parts.push("");
           parts.push(m.text.trim());
           pendingAi = null;
         }
@@ -429,26 +481,25 @@ function buildSubmissionBodyText(args: {
     }
     if (pendingAi) {
       qNumber += 1;
+      parts.push("");
       parts.push(`Q${qNumber}. ${pendingAi.text.trim()}`);
     }
   }
 
   if (args.pasteFallback.trim().length > 0) {
     parts.push("");
-    parts.push("AI CONVERSATION (PASTED)");
+    parts.push("");
+    parts.push(sectionHeader("AI conversation (pasted)"));
+    parts.push("");
     parts.push(args.pasteFallback.trim());
   }
 
   return parts.join("\n");
 }
 
-function textToParagraphs(s: string): string {
-  const trimmed = s.trim();
-  if (!trimmed) return "";
-  return trimmed
-    .split(/\n\s*\n/)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
-    .join("");
+function sectionHeader(label: string): string {
+  const upper = label.toUpperCase();
+  return `${upper}\n${"-".repeat(upper.length)}`;
 }
 
 function escapeHtml(s: string): string {
