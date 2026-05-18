@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Tables } from "@ai-documenter/db";
 
 type Prompt = Tables<"prompts">;
@@ -36,6 +37,12 @@ export function ReadOnlyPromptCard({
             <> · default for {policiesUsing} of your courses</>
           )}
         </div>
+        <Link
+          href={`/dashboard/prompts/${prompt.id}/preview`}
+          className="rounded-sm border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-maroon hover:text-maroon"
+        >
+          Preview
+        </Link>
       </header>
 
       <div className="space-y-4 px-4 py-3">

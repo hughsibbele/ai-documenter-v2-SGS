@@ -10,10 +10,8 @@ import {
 } from "react";
 import { submitIntake } from "@/lib/actions/intake";
 import { getStudentSession } from "@/lib/actions/session";
-import {
-  nextSocraticTurn,
-  type ReflectionMessage,
-} from "@/lib/actions/socratic";
+import { nextSocraticTurn } from "@/lib/actions/socratic";
+import type { ReflectionMessage } from "@/lib/socratic/types";
 import { finalizeReflection } from "@/lib/actions/finalize";
 import { BrandHeader } from "@/components/brand/BrandHeader";
 

@@ -271,7 +271,7 @@ function buildErrorMessage(err: unknown): string {
 // Sanitization is server-side on Canvas's end, so we keep to a small set of
 // HTML elements + inline styles. No classes (Canvas may strip unknown ones).
 
-function buildSubmissionBody(args: {
+export function buildSubmissionBody(args: {
   iframeToken: string;
   firstDraft: string;
   objectiveSummary: string;

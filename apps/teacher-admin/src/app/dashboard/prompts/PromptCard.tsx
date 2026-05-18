@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { Tables } from "@ai-documenter/db";
 import { savePrompt, deletePrompt } from "@/lib/actions/prompts";
@@ -104,16 +105,24 @@ export function PromptCard({
           )}
         </div>
         {!expanded && (
-          <button
-            type="button"
-            onClick={() => {
-              setExpanded(true);
-              setFeedback(null);
-            }}
-            className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-maroon hover:text-maroon"
-          >
-            Edit
-          </button>
+          <>
+            <Link
+              href={`/dashboard/prompts/${prompt.id}/preview`}
+              className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-maroon hover:text-maroon"
+            >
+              Preview
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setExpanded(true);
+                setFeedback(null);
+              }}
+              className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-maroon hover:text-maroon"
+            >
+              Edit
+            </button>
+          </>
         )}
       </header>
 
