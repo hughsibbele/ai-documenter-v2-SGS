@@ -52,6 +52,7 @@ type AuthState =
       displayName: string;
       hasActiveReflection: boolean;
       firstDraft: string | null;
+      objectiveSummary: string | null;
     };
 
 export default function StudentFlow({
@@ -75,6 +76,7 @@ export default function StudentFlow({
       displayName: info.displayName ?? "you",
       hasActiveReflection: info.hasActiveReflection,
       firstDraft: info.firstDraft,
+      objectiveSummary: info.objectiveSummary,
     });
   }, [iframeToken]);
 
@@ -99,6 +101,7 @@ export default function StudentFlow({
           studentDisplayName={auth.displayName}
           hasActiveReflection={auth.hasActiveReflection}
           firstDraft={auth.firstDraft}
+          objectiveSummary={auth.objectiveSummary}
           studentFacingQuestion={studentFacingQuestion}
           onIntakeSubmitted={refreshSession}
         />
@@ -258,6 +261,7 @@ function SignedInFlow({
   studentDisplayName,
   hasActiveReflection,
   firstDraft,
+  objectiveSummary,
   studentFacingQuestion,
   onIntakeSubmitted,
 }: {
@@ -265,6 +269,7 @@ function SignedInFlow({
   studentDisplayName: string;
   hasActiveReflection: boolean;
   firstDraft: string | null;
+  objectiveSummary: string | null;
   studentFacingQuestion: string;
   onIntakeSubmitted: () => Promise<void> | void;
 }) {
@@ -290,6 +295,7 @@ function SignedInFlow({
       iframeToken={iframeToken}
       studentFacingQuestion={studentFacingQuestion}
       firstDraft={firstDraft ?? ""}
+      objectiveSummary={objectiveSummary}
     />
   );
 }
@@ -496,10 +502,12 @@ function ConversationScreen({
   iframeToken,
   studentFacingQuestion,
   firstDraft,
+  objectiveSummary,
 }: {
   iframeToken: string;
   studentFacingQuestion: string;
   firstDraft: string;
+  objectiveSummary: string | null;
 }) {
   const [messages, setMessages] = useState<ReflectionMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -590,7 +598,17 @@ function ConversationScreen({
 
   const studentTurns = messages.filter((m) => m.role === "student").length;
   const totalStudentTurns = 2;
-  const aiHasOpened = messages.length > 0;
+  // The bootstrap turn writes the summary into both `objective_summary` and
+  // `reflection_messages[0]` (see socratic.ts). Filter it out of the bubble
+  // thread so it can render as a labelled card above instead — works for
+  // in-flight sessions without requiring a writer-side change.
+  const visibleMessages = objectiveSummary
+    ? messages.filter(
+        (m) => !(m.role === "ai" && m.text === objectiveSummary),
+      )
+    : messages;
+  const aiHasOpened = visibleMessages.length > 0;
+  const onBootstrapTurn = studentTurns === 0;
 
   if (loadError) {
     return (
@@ -615,11 +633,15 @@ function ConversationScreen({
           )}
         </ChatBubble>
 
-        {messages.map((m, i) => (
+        {objectiveSummary && (
+          <ObjectiveSummaryCard summary={objectiveSummary} />
+        )}
+
+        {visibleMessages.map((m, i) => (
           <ChatBubble
             key={i}
             role={m.role}
-            caption={captionFor(m, i, messages)}
+            caption={captionFor(m, i, visibleMessages)}
           >
             {m.text}
           </ChatBubble>
@@ -640,6 +662,11 @@ function ConversationScreen({
             onSend={send}
             disabled={pending}
             error={turnError}
+            placeholder={
+              onBootstrapTurn
+                ? "Answer the coach's question in 2–3 sentences. Take your time."
+                : "Type your answer here. Take your time — write as much as you need."
+            }
           />
         )
       )}
@@ -681,7 +708,7 @@ function captionFor(
   // Label the very first AI message so students know who's speaking; later
   // bubbles are clear from alignment alone.
   const aiBefore = all.slice(0, i + 1).filter((x) => x.role === "ai").length - 1;
-  return aiBefore === 0 ? "Reflection Partner" : undefined;
+  return aiBefore === 0 ? "Coach" : undefined;
 }
 
 // -----------------------------------------------------------------------------
@@ -780,6 +807,24 @@ function StaticPrompt({ text }: { text: string }) {
   );
 }
 
+function ObjectiveSummaryCard({ summary }: { summary: string }) {
+  return (
+    <section className="rounded-md border border-maroon/30 border-l-4 border-l-maroon bg-white px-5 py-4 shadow-sm">
+      <div className="ehs-eyebrow text-maroon">
+        Objective Summary of your AI Use
+      </div>
+      <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
+        {summary}
+      </p>
+      <hr className="my-3 border-light-blue/60" />
+      <p className="text-sm italic text-cool-gray">
+        Read this, then answer the coach&rsquo;s question below in 2&ndash;3
+        sentences.
+      </p>
+    </section>
+  );
+}
+
 function ChatBubble({
   role,
   caption,
@@ -829,19 +874,21 @@ function Composer({
   onSend,
   disabled,
   error,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
   disabled: boolean;
   error: string | null;
+  placeholder: string;
 }) {
   return (
     <div className="rounded-md border border-light-blue/80 bg-white shadow-sm">
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Type your answer here. Take your time — write as much as you need."
+        placeholder={placeholder}
         rows={6}
         disabled={disabled}
         onKeyDown={(e) => {

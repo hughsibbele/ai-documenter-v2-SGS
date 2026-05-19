@@ -107,6 +107,7 @@ export default function PreviewFlow({
         <PreviewShell title={assignmentName} subtitle={courseName}>
           <ConversationStep
             firstDraft={intake.firstDraft}
+            objectiveSummary={objectiveSummary}
             messages={messages}
             pending={pending}
             error={turnError}
@@ -492,6 +493,7 @@ function IntakeStep({
 
 function ConversationStep({
   firstDraft,
+  objectiveSummary,
   messages,
   pending,
   error,
@@ -500,6 +502,7 @@ function ConversationStep({
   onContinueToDone,
 }: {
   firstDraft: string;
+  objectiveSummary: string;
   messages: ReflectionMessage[];
   pending: boolean;
   error: string | null;
@@ -511,6 +514,14 @@ function ConversationStep({
   const studentTurns = messages.filter((m) => m.role === "student").length;
   const totalStudentTurns = 2;
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
+  // Match StudentFlow's M4.9 redesign: lift the summary out of the chat
+  // thread into a labelled card so students read it before answering.
+  const visibleMessages = objectiveSummary
+    ? messages.filter(
+        (m) => !(m.role === "ai" && m.text === objectiveSummary),
+      )
+    : messages;
+  const onBootstrapTurn = studentTurns === 0;
 
   useEffect(() => {
     if (scrollAnchorRef.current) {
@@ -558,11 +569,15 @@ function ConversationStep({
           )}
         </ChatBubble>
 
-        {messages.map((m, i) => (
+        {objectiveSummary && (
+          <ObjectiveSummaryCard summary={objectiveSummary} />
+        )}
+
+        {visibleMessages.map((m, i) => (
           <ChatBubble
             key={i}
             role={m.role}
-            caption={captionFor(m, i, messages)}
+            caption={captionFor(m, i, visibleMessages)}
           >
             {m.text}
           </ChatBubble>
@@ -593,7 +608,11 @@ function ConversationStep({
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Type your answer here. Take your time — write as much as you need."
+              placeholder={
+                onBootstrapTurn
+                  ? "Answer the coach's question in 2–3 sentences. Take your time."
+                  : "Type your answer here. Take your time — write as much as you need."
+              }
               rows={6}
               disabled={pending}
               onKeyDown={(e) => {
@@ -773,6 +792,24 @@ function StaticPrompt({ text }: { text: string }) {
   );
 }
 
+function ObjectiveSummaryCard({ summary }: { summary: string }) {
+  return (
+    <section className="rounded-md border border-maroon/30 border-l-4 border-l-maroon bg-white px-5 py-4 shadow-sm">
+      <div className="ehs-eyebrow text-maroon">
+        Objective Summary of your AI Use
+      </div>
+      <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
+        {summary}
+      </p>
+      <hr className="my-3 border-light-blue/60" />
+      <p className="text-sm italic text-cool-gray">
+        Read this, then answer the coach&rsquo;s question below in 2&ndash;3
+        sentences.
+      </p>
+    </section>
+  );
+}
+
 function ChatBubble({
   role,
   caption,
@@ -831,7 +868,7 @@ function captionFor(
 ): string | undefined {
   if (m.role === "student") return undefined;
   const aiBefore = all.slice(0, i + 1).filter((x) => x.role === "ai").length - 1;
-  return aiBefore === 0 ? "Reflection Partner" : undefined;
+  return aiBefore === 0 ? "Coach" : undefined;
 }
 
 function placeholderForTool(tool: Tool): string {

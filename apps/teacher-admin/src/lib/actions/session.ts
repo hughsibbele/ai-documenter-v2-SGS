@@ -11,6 +11,10 @@ export type StudentSessionInfo = {
    * Used by the Socratic page to display the student's committed thinking
    * above the coaching conversation. */
   firstDraft: string | null;
+  /** Server-generated objective summary of the student's AI use. Null until
+   * the bootstrap turn runs. Rendered as a labelled card above the chat
+   * thread (see M4.9). */
+  objectiveSummary: string | null;
 };
 
 // Resolve the current student session for a given iframe_token. Returns
@@ -31,6 +35,7 @@ export async function getStudentSession(args: {
       displayName: null,
       hasActiveReflection: false,
       firstDraft: null,
+      objectiveSummary: null,
     };
   }
 
@@ -46,11 +51,13 @@ export async function getStudentSession(args: {
       displayName: null,
       hasActiveReflection: false,
       firstDraft: null,
+      objectiveSummary: null,
     };
   }
 
   let hasActiveReflection = false;
   let firstDraft: string | null = null;
+  let objectiveSummary: string | null = null;
   if (args.iframeToken) {
     const { data: ta } = await admin
       .from("teacher_assignments")
@@ -60,7 +67,7 @@ export async function getStudentSession(args: {
     if (ta) {
       const { data: rs } = await admin
         .from("reflection_sessions")
-        .select("id, first_draft")
+        .select("id, first_draft, objective_summary")
         .eq("teacher_assignment_id", ta.id)
         .eq("student_id", student.id)
         .in("state", ["in_progress", "completed", "submitted"])
@@ -69,6 +76,7 @@ export async function getStudentSession(args: {
       if (rs) {
         hasActiveReflection = true;
         firstDraft = rs.first_draft;
+        objectiveSummary = rs.objective_summary;
       }
     }
   }
@@ -78,5 +86,6 @@ export async function getStudentSession(args: {
     displayName: student.display_name,
     hasActiveReflection,
     firstDraft,
+    objectiveSummary,
   };
 }
