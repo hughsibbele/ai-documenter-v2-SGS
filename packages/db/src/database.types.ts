@@ -188,34 +188,35 @@ export type Database = {
           },
         ]
       }
-      course_rosters: {
+      card_text_defaults: {
         Row: {
-          canvas_course_id: string
-          last_synced_at: string
-          students: Json
-          teacher_id: string
+          body: string
+          cta_label: string
+          footnote: string
+          id: number
+          kicker: string
+          title: string
+          updated_at: string
         }
         Insert: {
-          canvas_course_id: string
-          last_synced_at?: string
-          students?: Json
-          teacher_id: string
+          body?: string
+          cta_label?: string
+          footnote?: string
+          id: number
+          kicker?: string
+          title?: string
+          updated_at?: string
         }
         Update: {
-          canvas_course_id?: string
-          last_synced_at?: string
-          students?: Json
-          teacher_id?: string
+          body?: string
+          cta_label?: string
+          footnote?: string
+          id?: number
+          kicker?: string
+          title?: string
+          updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "course_rosters_teacher_id_fkey"
-            columns: ["teacher_id"]
-            isOneToOne: false
-            referencedRelation: "teachers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       course_install_policies: {
         Row: {
@@ -267,6 +268,35 @@ export type Database = {
           },
           {
             foreignKeyName: "course_install_policies_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_rosters: {
+        Row: {
+          canvas_course_id: string
+          last_synced_at: string
+          students: Json
+          teacher_id: string
+        }
+        Insert: {
+          canvas_course_id: string
+          last_synced_at?: string
+          students?: Json
+          teacher_id: string
+        }
+        Update: {
+          canvas_course_id?: string
+          last_synced_at?: string
+          students?: Json
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_rosters_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teachers"
@@ -558,6 +588,11 @@ export type Database = {
           auth_user_id: string
           canvas_host: string | null
           canvas_token_encrypted: string | null
+          card_body: string | null
+          card_cta_label: string | null
+          card_footnote: string | null
+          card_kicker: string | null
+          card_title: string | null
           created_at: string
           display_name: string
           email: string
@@ -571,6 +606,11 @@ export type Database = {
           auth_user_id: string
           canvas_host?: string | null
           canvas_token_encrypted?: string | null
+          card_body?: string | null
+          card_cta_label?: string | null
+          card_footnote?: string | null
+          card_kicker?: string | null
+          card_title?: string | null
           created_at?: string
           display_name: string
           email: string
@@ -584,6 +624,11 @@ export type Database = {
           auth_user_id?: string
           canvas_host?: string | null
           canvas_token_encrypted?: string | null
+          card_body?: string | null
+          card_cta_label?: string | null
+          card_footnote?: string | null
+          card_kicker?: string | null
+          card_title?: string | null
           created_at?: string
           display_name?: string
           email?: string

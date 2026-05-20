@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildReflectionBlock,
+  DEFAULT_REFLECTION_CARD_TEXT,
   findReflectionBlock,
   findReflectionMarkerBlock,
   hasReflectionMarkerBlock,
@@ -78,6 +79,52 @@ describe("buildReflectionBlock", () => {
         promptVersion: 1,
       }),
     ).toThrow(/appBaseUrl/);
+  });
+
+  it("renders the suite-default copy when no text override is passed", () => {
+    const out = buildReflectionBlock({
+      appBaseUrl: APP_BASE,
+      iframeToken: TOKEN,
+      promptVersion: 1,
+    });
+    expect(out).toContain(DEFAULT_REFLECTION_CARD_TEXT.title);
+    expect(out).toContain(DEFAULT_REFLECTION_CARD_TEXT.ctaLabel);
+    expect(out).toContain(DEFAULT_REFLECTION_CARD_TEXT.footnote);
+  });
+
+  it("uses per-field overrides while leaving missing fields on the default (M6.15b)", () => {
+    const out = buildReflectionBlock({
+      appBaseUrl: APP_BASE,
+      iframeToken: TOKEN,
+      promptVersion: 1,
+      text: {
+        kicker: "Ms. Day's English 11 · AI use disclosure",
+        title: "Tell me how you used AI on this draft",
+      },
+    });
+    // Overrides are rendered verbatim (apostrophes don't need escaping in text content).
+    expect(out).toContain("Ms. Day's English 11 · AI use disclosure");
+    expect(out).toContain("Tell me how you used AI on this draft");
+    // Defaults for the overridden fields are no longer present.
+    expect(out).not.toContain("AI Use Reflection · Required for credit");
+    expect(out).not.toContain("Reflect on your AI use for this assignment");
+    // Non-overridden fields still carry the defaults.
+    expect(out).toContain(DEFAULT_REFLECTION_CARD_TEXT.ctaLabel);
+    expect(out).toContain(DEFAULT_REFLECTION_CARD_TEXT.footnote);
+  });
+
+  it("HTML-escapes structural chars in text overrides (defense vs. tag injection)", () => {
+    const out = buildReflectionBlock({
+      appBaseUrl: APP_BASE,
+      iframeToken: TOKEN,
+      promptVersion: 1,
+      text: {
+        body: "<script>alert('x')</script> & friends",
+      },
+    });
+    expect(out).not.toContain("<script>");
+    expect(out).toContain("&lt;script&gt;");
+    expect(out).toContain("&amp; friends");
   });
 });
 

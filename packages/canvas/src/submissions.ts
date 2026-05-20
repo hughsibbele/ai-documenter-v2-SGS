@@ -52,7 +52,7 @@ export async function lookupCourseStudentByEmail(
 ): Promise<CanvasUser | null> {
   const lower = email.trim().toLowerCase();
   if (!lower) return null;
-  const localPart = lower.split("@")[0];
+  const localPart = lower.split("@")[0] ?? "";
 
   const users = await listCourseStudents(config, canvasCourseId);
   const match = users.find((u) => {

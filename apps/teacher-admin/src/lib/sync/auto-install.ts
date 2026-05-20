@@ -11,6 +11,7 @@ import {
 } from "@ai-documenter/canvas";
 import { decryptSecret, readKeyFromEnv } from "@ai-documenter/crypto";
 import { createAdminDbClient } from "@ai-documenter/db/admin";
+import { resolveCardTextForTeacher } from "@/lib/card-text/resolve";
 
 type AdminClient = ReturnType<typeof createAdminDbClient>;
 
@@ -225,17 +226,21 @@ async function installReflectionCardServiceRole(
     if (error) throw new Error(error.message);
   }
 
-  // Splice the reflection card into the Canvas description.
+  // Splice the reflection card into the Canvas description. M6.15b: resolve
+  // effective per-teacher card text so an auto-install picks up the same
+  // overrides a manual install would.
   const assignment = await getAssignment(
     config,
     canvasCourseId,
     canvasAssignmentId,
   );
   const existingDescription = assignment.description ?? "";
+  const cardText = await resolveCardTextForTeacher(teacherId);
   const block = buildReflectionBlock({
     appBaseUrl,
     iframeToken,
     promptVersion: 1,
+    text: cardText,
   });
   const newDescription = replaceOrAppendReflectionBlock(
     existingDescription,

@@ -36,6 +36,39 @@ export type FoundMarkerBlock = MarkerBlockMeta & {
   raw: string;
 };
 
+/**
+ * Plain-text strings teachers (or admins) can override per-teacher. The
+ * structure of the card (logo, colors, padding, layout) is fixed; only
+ * the words change. Each field is plain text — we HTML-escape on insert,
+ * so curly quotes and unicode characters pass through but tags do not.
+ *
+ * M6.15b: ported from OE's ExamCardText shape so the editor / preview /
+ * resolver code can mirror across apps.
+ */
+export type ReflectionCardText = {
+  /** Small ALL-CAPS line above the title. */
+  kicker: string;
+  /** h3 title under the kicker. */
+  title: string;
+  /** Paragraph body between title and CTA. */
+  body: string;
+  /** Button label. */
+  ctaLabel: string;
+  /** Italic line beneath the CTA. */
+  footnote: string;
+};
+
+/** Suite-default copy. Falls back here if no admin/teacher overrides are
+ *  provided. Kept in this file so the package has zero runtime dependency
+ *  on Supabase. */
+export const DEFAULT_REFLECTION_CARD_TEXT: ReflectionCardText = {
+  kicker: "AI Use Reflection · Required for credit",
+  title: "Reflect on your AI use for this assignment",
+  body: "Before this assignment is complete, you’ll have a brief Socratic conversation about how you used AI tools while working — Gemini, ChatGPT, Claude, or others. It takes 5–10 minutes, and your reflection submits to Canvas automatically when you finish.",
+  ctaLabel: "Open reflection →",
+  footnote: "Sign in with your @episcopalhighschool.org Google account.",
+};
+
 export type BuildReflectionBlockArgs = {
   /**
    * App origin where the standalone reflection lives. Used to construct both
@@ -50,6 +83,12 @@ export type BuildReflectionBlockArgs = {
   iframeToken: string;
   /** Monotonic prompt version, bumped on every prompt save. */
   promptVersion: number;
+  /**
+   * Optional plain-text overrides. Resolver typically reads
+   * teacher_overrides ?? card_text_defaults and passes the effective shape
+   * here. Falls back to DEFAULT_REFLECTION_CARD_TEXT field-by-field.
+   */
+  text?: Partial<ReflectionCardText>;
 };
 
 const SCHEMA_VERSION = 2;
@@ -72,15 +111,22 @@ export function buildReflectionBlock(args: BuildReflectionBlockArgs): string {
   const token = escapeMarkerAttr(args.iframeToken);
   const reflectionUrl = escapeHtmlAttr(`${base}/r/${token}`);
   const logoUrl = escapeHtmlAttr(`${base}/brand/ehs-horizontal.webp`);
+  const text: ReflectionCardText = {
+    kicker: args.text?.kicker ?? DEFAULT_REFLECTION_CARD_TEXT.kicker,
+    title: args.text?.title ?? DEFAULT_REFLECTION_CARD_TEXT.title,
+    body: args.text?.body ?? DEFAULT_REFLECTION_CARD_TEXT.body,
+    ctaLabel: args.text?.ctaLabel ?? DEFAULT_REFLECTION_CARD_TEXT.ctaLabel,
+    footnote: args.text?.footnote ?? DEFAULT_REFLECTION_CARD_TEXT.footnote,
+  };
   return [
     `<!-- ehs-ai-reflect:begin v=${SCHEMA_VERSION} iframe-token=${token} prompt-version=${args.promptVersion} -->`,
     `<div style="border:2px solid #7a1e46;border-radius:4px;padding:28px;margin:16px 0;background:#ffffff;font-family:Georgia,'Times New Roman',serif;">`,
     `<img src="${logoUrl}" alt="Episcopal High School" style="display:block;height:50px;width:auto;margin-bottom:18px;" />`,
-    `<div style="color:#54565b;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">AI Use Reflection &middot; Required for credit</div>`,
-    `<h3 style="margin:0 0 10px 0;color:#1a1a1a;font-size:20px;font-weight:normal;line-height:1.3;">Reflect on your AI use for this assignment</h3>`,
-    `<p style="margin:0 0 22px 0;color:#333;font-size:15px;line-height:1.6;">Before this assignment is complete, you'll have a brief Socratic conversation about how you used AI tools while working &mdash; Gemini, ChatGPT, Claude, or others. It takes 5&ndash;10 minutes, and your reflection submits to Canvas automatically when you finish.</p>`,
-    `<a href="${reflectionUrl}" style="display:inline-block;padding:12px 26px;background:#7a1e46;color:#ffffff;border-radius:3px;text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:15px;letter-spacing:0.3px;">Open reflection &rarr;</a>`,
-    `<p style="margin:14px 0 0 0;color:#54565b;font-size:12px;font-style:italic;">Sign in with your @episcopalhighschool.org Google account.</p>`,
+    `<div style="color:#54565b;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">${escapeHtmlText(text.kicker)}</div>`,
+    `<h3 style="margin:0 0 10px 0;color:#1a1a1a;font-size:20px;font-weight:normal;line-height:1.3;">${escapeHtmlText(text.title)}</h3>`,
+    `<p style="margin:0 0 22px 0;color:#333;font-size:15px;line-height:1.6;">${escapeHtmlText(text.body)}</p>`,
+    `<a href="${reflectionUrl}" style="display:inline-block;padding:12px 26px;background:#7a1e46;color:#ffffff;border-radius:3px;text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-weight:bold;font-size:15px;letter-spacing:0.3px;">${escapeHtmlText(text.ctaLabel)}</a>`,
+    `<p style="margin:14px 0 0 0;color:#54565b;font-size:12px;font-style:italic;">${escapeHtmlText(text.footnote)}</p>`,
     `</div>`,
     `<!-- ehs-ai-reflect:end -->`,
   ].join("\n");
@@ -230,6 +276,7 @@ function findCardBlockByToken(
   // after the anchor is our wrapper.
   for (let i = opens.length - 1; i >= 0; i--) {
     const open = opens[i];
+    if (!open) continue;
     const closeEnd = findMatchingDivClose(html, open.end);
     if (closeEnd < 0) continue;
     if (closeEnd >= aEnd) {
@@ -324,6 +371,15 @@ function escapeHtmlAttr(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/** Escape user-supplied plain text for inclusion inside an HTML element.
+ *  Quotes are fine inside text content; only the structural chars matter. */
+function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }

@@ -23,6 +23,11 @@ export default function AdminHome() {
           description="Grant or revoke admin access. Last admin can't be revoked."
         />
         <Tile
+          href="/admin/card-text"
+          title="Card text"
+          description="System defaults for the five strings inside the Canvas reflection card. Teachers override per-field on their setup page."
+        />
+        <Tile
           href="/admin/retention"
           title="Retention"
           description="Export and hard-delete reflection data per course or school-wide. End-of-year sweep lives here."

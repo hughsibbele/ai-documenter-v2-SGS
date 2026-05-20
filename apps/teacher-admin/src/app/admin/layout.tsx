@@ -30,6 +30,12 @@ export default async function AdminLayout({
         Admins
       </Link>
       <Link
+        href="/admin/card-text"
+        className="text-ink transition-colors hover:text-dark-blue"
+      >
+        Card text
+      </Link>
+      <Link
         href="/admin/retention"
         className="text-ink transition-colors hover:text-dark-blue"
       >

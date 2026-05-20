@@ -1,12 +1,23 @@
 import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { disconnectCanvas } from "@/lib/actions/canvas-token";
+import {
+  loadCardTextDefaults,
+  loadTeacherCardOverrides,
+} from "@/lib/card-text/resolve";
 import { ConnectForm } from "./ConnectForm";
+import { CardTextEditor } from "./CardTextEditor";
 
 export default async function SetupPage() {
   const teacher = await getCurrentTeacher();
   const isConnected = Boolean(
     teacher.canvas_token_encrypted && teacher.canvas_host,
   );
+  const [defaults, overrides] = await Promise.all([
+    loadCardTextDefaults(),
+    loadTeacherCardOverrides(teacher.id),
+  ]);
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -73,6 +84,12 @@ export default async function SetupPage() {
         </ol>
         <ConnectForm />
       </div>
+
+      <CardTextEditor
+        defaults={defaults}
+        overrides={overrides}
+        appBaseUrl={appBaseUrl}
+      />
 
       <div className="rounded-md border border-stone-200 bg-white p-5 text-sm">
         <h2 className="mb-2 text-sm font-semibold text-stone-900">

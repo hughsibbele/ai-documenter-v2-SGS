@@ -15,6 +15,7 @@ import { decryptSecret, readKeyFromEnv } from "@ai-documenter/crypto";
 import { createAdminDbClient } from "@ai-documenter/db/admin";
 import type { Tables } from "@ai-documenter/db";
 import { getCurrentTeacher } from "@/lib/auth/teacher";
+import { resolveCardTextForTeacher } from "@/lib/card-text/resolve";
 import type {
   AssignmentResult,
   InstallActionResult,
@@ -175,10 +176,15 @@ async function installOne(
   //    only needs to carry our identity (iframe-token) and a schema version.
   //    The block builder constructs both the CTA href (/r/<token>) and the
   //    logo img src (/brand/ehs-horizontal.webp) from the app origin.
+  //    M6.15b: pull effective per-teacher card text — falls all the way back
+  //    to DEFAULT_REFLECTION_CARD_TEXT inside the resolver if the defaults
+  //    row is somehow missing.
+  const cardText = await resolveCardTextForTeacher(teacherId);
   const block = buildReflectionBlock({
     appBaseUrl,
     iframeToken: ta.iframe_token,
     promptVersion: 1,
+    text: cardText,
   });
 
   // 4. Splice into the existing description and PUT — but skip the PUT if
