@@ -8,8 +8,9 @@ export type CanvasUser = {
   name: string;
   short_name?: string;
   sortable_name?: string;
+  email?: string | null;
   primary_email?: string;
-  login_id?: string;
+  login_id?: string | null;
 };
 
 export type CanvasTerm = {

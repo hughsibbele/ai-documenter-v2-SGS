@@ -85,11 +85,25 @@ export async function syncTeacherRosters(
   for (const c of courses) {
     try {
       const users = await listCourseStudents(config, c.canvas_course_id);
-      const students: RosterStudent[] = users.map((u) => ({
-        canvas_user_id: String(u.id),
-        name: u.name,
-        email: u.primary_email ?? u.login_id ?? null,
-      }));
+      // Canvas's `/courses/:id/users?include[]=email` populates `email`,
+      // not `primary_email` (which only shows on `/users/:id/profile`).
+      // Old code read primary_email first and fell through to login_id,
+      // which stored short identifier strings like "jsmith23" as the
+      // email — they never matched the student's Google-OAuth identity
+      // at sign-in. Reject rows where the resolved value still isn't
+      // email-shaped rather than storing fake emails. Discovered in OE
+      // 2026-05-20.
+      const students: RosterStudent[] = users.flatMap((u) => {
+        const raw = (u.email ?? u.primary_email ?? "").trim().toLowerCase();
+        if (!raw || !raw.includes("@")) return [];
+        return [
+          {
+            canvas_user_id: String(u.id),
+            name: u.name,
+            email: raw,
+          },
+        ];
+      });
       const { error } = await admin
         .from("course_rosters")
         .upsert(
