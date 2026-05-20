@@ -23,6 +23,12 @@ export type SocraticTurnResult =
       ok: true;
       messages: ReflectionMessage[];
       conversationDone: boolean;
+      /** Only set on the bootstrap turn — the summary just written to
+       * `reflection_sessions.objective_summary`. The client uses this to seed
+       * its local objectiveSummary state, since the auth-state refresh that
+       * preceded ConversationScreen mount happened *before* the bootstrap and
+       * so missed the write. See M4.9 race fix. */
+      objectiveSummary?: string;
     }
   | { ok: false; error: string };
 
@@ -157,7 +163,12 @@ export async function nextSocraticTurn(
       })
       .eq("id", session.id);
 
-    return { ok: true, messages: newMessages, conversationDone: false };
+    return {
+      ok: true,
+      messages: newMessages,
+      conversationDone: false,
+      objectiveSummary: summaryRes.summary,
+    };
   }
 
   // ---- Student answers Q1 → append student turn + hardcoded final Q ----

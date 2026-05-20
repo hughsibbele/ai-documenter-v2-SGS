@@ -295,7 +295,7 @@ function SignedInFlow({
       iframeToken={iframeToken}
       studentFacingQuestion={studentFacingQuestion}
       firstDraft={firstDraft ?? ""}
-      objectiveSummary={objectiveSummary}
+      initialObjectiveSummary={objectiveSummary}
     />
   );
 }
@@ -502,14 +502,22 @@ function ConversationScreen({
   iframeToken,
   studentFacingQuestion,
   firstDraft,
-  objectiveSummary,
+  initialObjectiveSummary,
 }: {
   iframeToken: string;
   studentFacingQuestion: string;
   firstDraft: string;
-  objectiveSummary: string | null;
+  initialObjectiveSummary: string | null;
 }) {
   const [messages, setMessages] = useState<ReflectionMessage[]>([]);
+  // Local state seeded from the prop: when this screen mounts on a *fresh*
+  // session, the auth-state refresh that runs right after intake reads
+  // objective_summary BEFORE the bootstrap turn writes it, so the prop is
+  // null. The bootstrap call below returns the summary back in its response,
+  // and we hydrate the local state then so the card can render.
+  const [objectiveSummary, setObjectiveSummary] = useState<string | null>(
+    initialObjectiveSummary,
+  );
   const [draft, setDraft] = useState("");
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
@@ -528,6 +536,9 @@ function ConversationScreen({
       if (res.ok) {
         setMessages(res.messages);
         setDone(res.conversationDone);
+        if (res.objectiveSummary) {
+          setObjectiveSummary(res.objectiveSummary);
+        }
       } else {
         setLoadError(res.error);
       }
