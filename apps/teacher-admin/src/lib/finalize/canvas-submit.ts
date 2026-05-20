@@ -31,18 +31,23 @@ type AiChat = { tool: string; url: string; transcript_text: string | null };
 /**
  * Build the Canvas submission body and POST it as the student.
  *
- * Two paths based on teacher_assignment.use_submission_body (set at install):
+ * M6.18a — destination is now the triple `{post_to_drive,
+ * post_to_canvas_comment, post_to_canvas_submission}` on teacher_assignments.
+ * This finalizer only handles the Canvas legs; Drive write fires when M7.3
+ * lands. Canvas leg branches on the submission flag:
  *
- *   - **false (default)** — comment-only. PUTs the plain-text reflection as
- *     a submission comment via as_user_id masquerade. Works on every Canvas
- *     assignment type regardless of submission_types[]. The student's actual
- *     essay/file/upload stays as the canonical submission. No fallback to
- *     body-POST if the comment fails — the teacher opted into comment.
+ *   - **post_to_canvas_submission=false** — comment-only path (or no-op if
+ *     post_to_canvas_comment is also off, which only happens in "Drive only"
+ *     mode — caller suppresses the Canvas call entirely in that case).
+ *     PUTs the plain-text reflection as a submission comment via
+ *     as_user_id masquerade. Works on every Canvas assignment type.
  *
- *   - **true** — body-as-submission. POSTs the HTML reflection as an
- *     online_text_entry submission. On a 400/422 (assignment doesn't allow
- *     text entry, e.g. file-upload-only), falls back to comment-PUT. Used
- *     for AI-literacy assignments where the reflection IS the deliverable.
+ *   - **post_to_canvas_submission=true** — body-as-submission. POSTs the
+ *     HTML reflection as an online_text_entry submission. On a 400/422
+ *     (assignment doesn't allow text entry, e.g. file-upload-only), falls
+ *     back to comment-PUT (only if post_to_canvas_comment is also true;
+ *     otherwise reports the error). Used for AI-literacy assignments where
+ *     the reflection IS the deliverable.
  *
  * Common to both paths:
  *   1. Decrypt the teacher's stored Canvas token.
@@ -145,9 +150,10 @@ export async function submitReflectionToCanvas(args: {
   // Default path: comment-only. The teacher's actual submission (essay, file,
   // discussion posts, etc.) stays as the canonical submission; our reflection
   // attaches as a side-channel comment. No body-POST attempted — if the
-  // teacher wanted that path, they would have set use_submission_body=true
-  // at install.
-  if (!teacherAssignment.use_submission_body) {
+  // teacher wanted that path, they would have set
+  // post_to_canvas_submission=true at install (M6.18a). The legacy column
+  // `use_submission_body` is kept in sync at write time for one cycle.
+  if (!teacherAssignment.post_to_canvas_submission) {
     const textBody = buildSubmissionBodyText(bodyArgs);
     try {
       const { submissionId } = await postSubmissionCommentAsStudent(

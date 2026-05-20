@@ -363,7 +363,13 @@ function BulkActions({
   const defaultId =
     promptOptions.find((p) => p.is_default)?.id ?? promptOptions[0]?.id ?? "";
   const [selectedPromptId, setSelectedPromptId] = useState<string>(defaultId);
-  const [useSubmissionBody, setUseSubmissionBody] = useState(false);
+  // M6.18a: 3-checkbox destination picker. Defaults: Drive ✓ (writer fires
+  // when M7.3 lands; checkbox stores intent now), Draft comment ✓ (lowest
+  // risk — never overwrites the student's actual submission), Submission ✗
+  // (opt-in for "reflection IS the deliverable").
+  const [postToDrive, setPostToDrive] = useState(true);
+  const [postToComment, setPostToComment] = useState(true);
+  const [postToSubmission, setPostToSubmission] = useState(false);
 
   const someInstalled = selectedAssignments.some(
     (a) => a.install?.status === "installed",
@@ -378,7 +384,11 @@ function BulkActions({
               canvasCourseId,
               selectedIds,
               selectedPromptId,
-              useSubmissionBody,
+              {
+                drive: postToDrive,
+                comment: postToComment,
+                submission: postToSubmission,
+              },
             )
           : await uninstallFromAssignments(canvasCourseId, selectedIds);
       setResult(r);
@@ -409,21 +419,32 @@ function BulkActions({
           ))}
         </select>
       </label>
-      <label
-        className="inline-flex items-center gap-1.5 text-stone-600"
-        title="Off (default): reflection lands as a Canvas submission comment, so the student's own work stays as the main submission. On: reflection IS the submission body — pick this only for assignments where the reflection itself is what you're grading."
-      >
-        <input
-          type="checkbox"
-          checked={useSubmissionBody}
-          onChange={(e) => setUseSubmissionBody(e.target.checked)}
+      <fieldset className="inline-flex items-center gap-3 text-stone-600">
+        <legend className="text-[11px] uppercase tracking-wide text-stone-500">
+          Reflection submitted to:
+        </legend>
+        <DestinationCheckbox
+          label="Drive"
+          checked={postToDrive}
+          onChange={setPostToDrive}
           disabled={pending}
-          className="h-3.5 w-3.5 rounded border-stone-300 accent-maroon disabled:opacity-50"
+          title="Save the reflection to a Google Doc in your Drive folder. Writer ships with M7.3 — for now, this checkbox stores your preference and lights up when the writer goes live."
         />
-        <span className="text-[11px] uppercase tracking-wide text-stone-500">
-          Reflection IS the submission
-        </span>
-      </label>
+        <DestinationCheckbox
+          label="Canvas as draft comment"
+          checked={postToComment}
+          onChange={setPostToComment}
+          disabled={pending}
+          title="Post the reflection as a draft submission comment, visible to you in SpeedGrader. Lowest risk — never overwrites the student's actual submission."
+        />
+        <DestinationCheckbox
+          label="Canvas as submission"
+          checked={postToSubmission}
+          onChange={setPostToSubmission}
+          disabled={pending}
+          title="Post the reflection as the student's submission body. Use only for assignments where the reflection IS the deliverable."
+        />
+      </fieldset>
       <button
         type="button"
         onClick={onClearSelection}
@@ -445,8 +466,17 @@ function BulkActions({
       <button
         type="button"
         onClick={() => run("install")}
-        disabled={pending || !selectedPromptId}
+        disabled={
+          pending ||
+          !selectedPromptId ||
+          (!postToDrive && !postToComment && !postToSubmission)
+        }
         className="rounded-md bg-maroon px-3 py-1 font-semibold text-white hover:bg-maroon-dark disabled:opacity-50"
+        title={
+          !postToDrive && !postToComment && !postToSubmission
+            ? "Pick at least one destination."
+            : undefined
+        }
       >
         {pending
           ? "Installing…"
@@ -456,9 +486,11 @@ function BulkActions({
       </button>
 
       <p className="basis-full text-[11px] italic text-stone-500">
-        {useSubmissionBody
-          ? "Reflection will be posted as the main submission body. Use only when the reflection IS the assignment."
-          : "Reflection will be posted as a submission comment. The student's own work stays as the main submission."}
+        {describeDestination({
+          drive: postToDrive,
+          comment: postToComment,
+          submission: postToSubmission,
+        })}
       </p>
 
       {result && result.failureCount > 0 && (
@@ -478,6 +510,60 @@ function BulkActions({
       )}
     </div>
   );
+}
+
+function DestinationCheckbox({
+  label,
+  checked,
+  onChange,
+  disabled,
+  title,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled: boolean;
+  title: string;
+}) {
+  return (
+    <label
+      className="inline-flex items-center gap-1.5"
+      title={title}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="h-3.5 w-3.5 rounded border-stone-300 accent-maroon disabled:opacity-50"
+      />
+      <span className="text-xs">{label}</span>
+    </label>
+  );
+}
+
+/** Plain-English summary of the chosen destination set. Drives the
+ *  live hint line below the bulk-actions bar so the teacher sees what
+ *  install will actually do before they click. */
+function describeDestination(d: {
+  drive: boolean;
+  comment: boolean;
+  submission: boolean;
+}): string {
+  const targets: string[] = [];
+  if (d.drive) targets.push("a Google Doc in your Drive folder");
+  if (d.comment) targets.push("a Canvas draft comment");
+  if (d.submission) targets.push("the student's Canvas submission body");
+  if (targets.length === 0) {
+    return "Nothing checked — reflection won't be saved anywhere. Pick at least one destination.";
+  }
+  if (targets.length === 1) {
+    return `Reflection will be saved to ${targets[0]}.`;
+  }
+  if (targets.length === 2) {
+    return `Reflection will be saved to ${targets[0]} and ${targets[1]}.`;
+  }
+  return `Reflection will be saved to ${targets[0]}, ${targets[1]}, and ${targets[2]}.`;
 }
 
 function Chevron({ open }: { open: boolean }) {

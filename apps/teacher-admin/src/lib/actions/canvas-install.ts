@@ -26,18 +26,36 @@ type Prompt = Tables<"prompts">;
 type Policy = Tables<"course_install_policies">;
 type TeacherAssignment = Tables<"teacher_assignments">;
 
+/**
+ * M6.18a: deliverable-destination triple. Each independent — any
+ * combination including all three is valid. "Drive only" = drive=true,
+ * both Canvas flags false. The DB columns are NOT NULL with sensible
+ * defaults so older callers that don't pass this still install.
+ */
+export type Destination = {
+  drive: boolean;
+  comment: boolean;
+  submission: boolean;
+};
+
+const DEFAULT_DESTINATION: Destination = {
+  drive: true,
+  comment: true,
+  submission: false,
+};
+
 export async function installOnAssignments(
   canvasCourseId: string,
   canvasAssignmentIds: string[],
   promptId: string,
-  useSubmissionBody: boolean,
+  destination: Destination = DEFAULT_DESTINATION,
 ): Promise<InstallActionResult> {
   return runForAssignments(
     canvasCourseId,
     canvasAssignmentIds,
     "install",
     promptId,
-    useSubmissionBody,
+    destination,
   );
 }
 
@@ -50,7 +68,7 @@ export async function uninstallFromAssignments(
     canvasAssignmentIds,
     "uninstall",
     null,
-    false,
+    DEFAULT_DESTINATION,
   );
 }
 
@@ -59,7 +77,7 @@ async function runForAssignments(
   canvasAssignmentIds: string[],
   op: "install" | "uninstall",
   promptId: string | null,
-  useSubmissionBody: boolean,
+  destination: Destination,
 ): Promise<InstallActionResult> {
   const teacher = await getCurrentTeacher();
   if (!teacher.canvas_host || !teacher.canvas_token_encrypted) {
@@ -119,7 +137,7 @@ async function runForAssignments(
               aid,
               prompt!,
               appBaseUrl!,
-              useSubmissionBody,
+              destination,
             )
           : await uninstallOne(admin, config, teacher.id, canvasCourseId, aid);
       results.push(r);
@@ -153,18 +171,19 @@ async function installOne(
   canvasAssignmentId: string,
   prompt: Prompt,
   appBaseUrl: string,
-  useSubmissionBody: boolean,
+  destination: Destination,
 ): Promise<AssignmentResult> {
   // 1. teacher_assignments row (one per Canvas assignment) — keeps the
-  //    iframe_token stable across re-installs. Updates prompt_id and
-  //    use_submission_body to reflect the teacher's latest choices.
+  //    iframe_token stable across re-installs. Updates prompt_id and the
+  //    destination triple (M6.18a) to reflect the teacher's latest
+  //    choices.
   const ta = await ensureTeacherAssignment(
     admin,
     teacherId,
     canvasCourseId,
     canvasAssignmentId,
     prompt.id,
-    useSubmissionBody,
+    destination,
   );
 
   // 2. Read current description from Canvas.
@@ -339,7 +358,7 @@ async function ensureTeacherAssignment(
   canvasCourseId: string,
   canvasAssignmentId: string,
   promptId: string,
-  useSubmissionBody: boolean,
+  destination: Destination,
 ): Promise<TeacherAssignment> {
   const { data: existing } = await admin
     .from("teacher_assignments")
@@ -350,11 +369,23 @@ async function ensureTeacherAssignment(
 
   if (existing) {
     const promptChanged = existing.prompt_id !== promptId;
-    const modeChanged = existing.use_submission_body !== useSubmissionBody;
-    if (promptChanged || modeChanged) {
+    const destChanged =
+      existing.post_to_drive !== destination.drive ||
+      existing.post_to_canvas_comment !== destination.comment ||
+      existing.post_to_canvas_submission !== destination.submission;
+    if (promptChanged || destChanged) {
       const { data: updated, error } = await admin
         .from("teacher_assignments")
-        .update({ prompt_id: promptId, use_submission_body: useSubmissionBody })
+        .update({
+          prompt_id: promptId,
+          post_to_drive: destination.drive,
+          post_to_canvas_comment: destination.comment,
+          post_to_canvas_submission: destination.submission,
+          // Legacy mirror — kept in sync for one cycle until use_submission_body
+          // is dropped. Any code still reading the old column gets the right
+          // answer.
+          use_submission_body: destination.submission,
+        })
         .eq("id", existing.id)
         .select("*")
         .single();
@@ -376,7 +407,10 @@ async function ensureTeacherAssignment(
       canvas_assignment_id: canvasAssignmentId,
       prompt_id: promptId,
       iframe_token: randomUUID().replaceAll("-", ""),
-      use_submission_body: useSubmissionBody,
+      post_to_drive: destination.drive,
+      post_to_canvas_comment: destination.comment,
+      post_to_canvas_submission: destination.submission,
+      use_submission_body: destination.submission,
     })
     .select("*")
     .single();

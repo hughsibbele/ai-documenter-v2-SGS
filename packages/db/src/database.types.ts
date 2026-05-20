@@ -532,6 +532,9 @@ export type Database = {
           created_at: string
           id: string
           iframe_token: string
+          post_to_canvas_comment: boolean
+          post_to_canvas_submission: boolean
+          post_to_drive: boolean
           prompt_id: string
           teacher_id: string
           updated_at: string
@@ -546,6 +549,9 @@ export type Database = {
           created_at?: string
           id?: string
           iframe_token: string
+          post_to_canvas_comment?: boolean
+          post_to_canvas_submission?: boolean
+          post_to_drive?: boolean
           prompt_id: string
           teacher_id: string
           updated_at?: string
@@ -560,6 +566,9 @@ export type Database = {
           created_at?: string
           id?: string
           iframe_token?: string
+          post_to_canvas_comment?: boolean
+          post_to_canvas_submission?: boolean
+          post_to_drive?: boolean
           prompt_id?: string
           teacher_id?: string
           updated_at?: string
