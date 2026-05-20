@@ -91,7 +91,9 @@ async function CourseList({
       .eq("teacher_id", teacherId),
     supabase
       .from("teacher_assignments")
-      .select("canvas_assignment_id, prompt_id")
+      .select(
+        "canvas_assignment_id, prompt_id, post_to_drive, post_to_canvas_comment, post_to_canvas_submission",
+      )
       .eq("teacher_id", teacherId),
     // RLS returns system prompts + this teacher's personal prompts.
     // Filter to reflection prompts — the objective-summary prompt is admin
@@ -121,6 +123,16 @@ async function CourseList({
   const promptIdByCanvasAssignmentId = new Map(
     teacherAssignments.map((ta) => [ta.canvas_assignment_id, ta.prompt_id]),
   );
+  const destinationByCanvasAssignmentId = new Map(
+    teacherAssignments.map((ta) => [
+      ta.canvas_assignment_id,
+      {
+        drive: ta.post_to_drive,
+        comment: ta.post_to_canvas_comment,
+        submission: ta.post_to_canvas_submission,
+      },
+    ]),
+  );
   const promptLabelById = new Map(
     promptOptions.map((p) => [p.id, p.label]),
   );
@@ -139,6 +151,9 @@ async function CourseList({
             promptLabel: promptId ? promptLabelById.get(promptId) ?? null : null,
             reflectionCount:
               reflectionCounts.get(a.canvas_assignment_id) ?? 0,
+            destination:
+              destinationByCanvasAssignmentId.get(a.canvas_assignment_id) ??
+              null,
           };
         })
         .sort(byDueDateThenName);

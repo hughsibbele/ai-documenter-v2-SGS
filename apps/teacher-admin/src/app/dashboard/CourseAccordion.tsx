@@ -363,13 +363,17 @@ function BulkActions({
   const defaultId =
     promptOptions.find((p) => p.is_default)?.id ?? promptOptions[0]?.id ?? "";
   const [selectedPromptId, setSelectedPromptId] = useState<string>(defaultId);
-  // M6.18a: 3-checkbox destination picker. Defaults: Drive ✓ (writer fires
-  // when M7.3 lands; checkbox stores intent now), Draft comment ✓ (lowest
-  // risk — never overwrites the student's actual submission), Submission ✗
-  // (opt-in for "reflection IS the deliverable").
-  const [postToDrive, setPostToDrive] = useState(true);
-  const [postToComment, setPostToComment] = useState(true);
-  const [postToSubmission, setPostToSubmission] = useState(false);
+  // M6.18a: 3-checkbox destination picker. Pre-fill from the first
+  // selected assignment's saved state — so a teacher reinstalling a row
+  // sees what's currently bound, not the per-app defaults. Falls back to
+  // AID defaults (Drive ✓ + Draft comment ✓ + Submission ✗) when no
+  // teacher_assignments row exists yet.
+  const firstSaved = selectedAssignments[0]?.destination ?? null;
+  const [postToDrive, setPostToDrive] = useState(firstSaved?.drive ?? true);
+  const [postToComment, setPostToComment] = useState(firstSaved?.comment ?? true);
+  const [postToSubmission, setPostToSubmission] = useState(
+    firstSaved?.submission ?? false,
+  );
 
   const someInstalled = selectedAssignments.some(
     (a) => a.install?.status === "installed",
