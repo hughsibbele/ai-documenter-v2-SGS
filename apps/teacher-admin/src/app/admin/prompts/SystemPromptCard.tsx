@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { Tables } from "@ai-documenter/db";
 import {
   saveSystemPrompt,
   deleteSystemPrompt,
 } from "@/lib/actions/system-prompts";
+import { useAutoSaveDispatch } from "@/components/auto-save/context";
+import { useAutoSaveForm } from "@/components/auto-save/useAutoSaveForm";
 
 type Prompt = Tables<"prompts">;
 
@@ -18,55 +20,81 @@ export function SystemPromptCard({
   assignmentsUsing: number;
   policiesUsing: number;
 }) {
-  const [label, setLabel] = useState(prompt.label);
-  const [studentFacingQuestion, setStudentFacingQuestion] = useState(
+  // Local mirror of the most-recently-saved values, used by the
+  // collapsed preview. Uncontrolled inputs hold the live editing
+  // state; on save success we sync these so the preview reflects
+  // the latest body even before the next router refresh.
+  const [savedLabel, setSavedLabel] = useState(prompt.label);
+  const [savedSFQ, setSavedSFQ] = useState(
     prompt.student_facing_question ?? "",
   );
-  const [body, setBody] = useState(prompt.body);
+  const [savedBody, setSavedBody] = useState(prompt.body);
   const [pending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState<
-    | null
-    | { kind: "ok"; message: string }
-    | { kind: "error"; message: string }
-  >(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const dirty =
-    label !== prompt.label ||
-    body !== prompt.body ||
-    studentFacingQuestion !== (prompt.student_facing_question ?? "");
+  const dispatch = useAutoSaveDispatch();
+  const formRef = useRef<HTMLFormElement>(null);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const sfqRef = useRef<HTMLTextAreaElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  // Objective-summary prompts have no student-facing question (they're admin
-  // infrastructure, never shown to students).
   const isSummary = prompt.purpose === "objective_summary";
 
-  function onSave() {
-    setFeedback(null);
+  function save() {
+    const label = labelRef.current?.value ?? savedLabel;
+    const body = bodyRef.current?.value ?? savedBody;
+    const sfq = sfqRef.current?.value ?? savedSFQ;
+    const labelChanged = label !== labelRef.current?.defaultValue;
+    const bodyChanged = body !== bodyRef.current?.defaultValue;
+    const sfqChanged = sfqRef.current
+      ? sfq !== sfqRef.current.defaultValue
+      : false;
+    if (!labelChanged && !bodyChanged && !sfqChanged) return;
+
+    dispatch({ kind: "saving" });
     startTransition(async () => {
       const r = await saveSystemPrompt(prompt.id, {
-        label: label !== prompt.label ? label : undefined,
-        body: body !== prompt.body ? body : undefined,
-        studentFacingQuestion:
-          studentFacingQuestion !== (prompt.student_facing_question ?? "")
-            ? studentFacingQuestion
-            : undefined,
+        label: labelChanged ? label : undefined,
+        body: bodyChanged ? body : undefined,
+        studentFacingQuestion: sfqChanged ? sfq : undefined,
       });
       if (r.ok) {
-        setFeedback({ kind: "ok", message: "Saved." });
-        setExpanded(false);
+        if (labelChanged) {
+          setSavedLabel(label);
+          if (labelRef.current) labelRef.current.defaultValue = label;
+        }
+        if (bodyChanged) {
+          setSavedBody(body);
+          if (bodyRef.current) bodyRef.current.defaultValue = body;
+        }
+        if (sfqChanged) {
+          setSavedSFQ(sfq);
+          if (sfqRef.current) sfqRef.current.defaultValue = sfq;
+        }
+        dispatch({ kind: "saved", at: Date.now() });
       } else {
-        setFeedback({ kind: "error", message: r.message });
+        dispatch({ kind: "error", msg: r.message });
       }
     });
   }
 
+  useAutoSaveForm({
+    formRef,
+    save,
+    // expand-state is part of the freshness key so a collapse→expand
+    // round-trip resets pending debounce timers.
+    freshnessKey: `${prompt.updated_at}:${expanded ? "open" : "closed"}`,
+  });
+
   function onDelete() {
-    setFeedback(null);
+    dispatch({ kind: "saving" });
     startTransition(async () => {
       const r = await deleteSystemPrompt(prompt.id);
-      if (!r.ok) {
-        setFeedback({ kind: "error", message: r.message });
+      if (r.ok) {
+        dispatch({ kind: "saved", at: Date.now() });
+      } else {
+        dispatch({ kind: "error", msg: r.message });
         setConfirmDelete(false);
       }
     });
@@ -78,129 +106,118 @@ export function SystemPromptCard({
         prompt.is_default ? "border-dark-blue/30" : "border-stone-200"
       }`}
     >
-      <header className="flex flex-wrap items-center gap-3 px-4 py-3">
-        {expanded ? (
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            spellCheck={false}
-            className="min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-stone-900 hover:border-stone-200 focus:border-dark-blue focus:bg-white"
+      <form
+        ref={formRef}
+        onSubmit={(e) => e.preventDefault()}
+      >
+        <header className="flex flex-wrap items-center gap-3 px-4 py-3">
+          {expanded ? (
+            <input
+              ref={labelRef}
+              type="text"
+              name="label"
+              defaultValue={savedLabel}
+              spellCheck={false}
+              className="min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-stone-900 hover:border-stone-200 focus:border-dark-blue focus:bg-white"
+            />
+          ) : (
+            <h3 className="min-w-0 flex-1 truncate px-2 py-1 text-base font-semibold text-stone-900">
+              {savedLabel}
+            </h3>
+          )}
+          {prompt.is_default && (
+            <span className="rounded-full bg-dark-blue/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-dark-blue">
+              Default
+            </span>
+          )}
+          <span className="rounded-full border border-stone-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+            {isSummary ? "Summary" : "System"}
+          </span>
+          <div className="text-[11px] text-stone-500">
+            {isSummary
+              ? "Used after every reflection completes"
+              : `Used on ${assignmentsUsing} assignment${
+                  assignmentsUsing === 1 ? "" : "s"
+                } (across all teachers)`}
+            {!isSummary && policiesUsing > 0 && (
+              <>
+                {" "}
+                · default for {policiesUsing} course
+                {policiesUsing === 1 ? "" : "s"}
+              </>
+            )}
+          </div>
+          {!expanded ? (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-dark-blue hover:text-dark-blue"
+            >
+              Edit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              disabled={pending}
+              className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-stone-400 disabled:opacity-50"
+            >
+              Done
+            </button>
+          )}
+        </header>
+
+        {!expanded ? (
+          <SystemPromptPreview
+            isSummary={isSummary}
+            studentFacingQuestion={savedSFQ}
+            body={savedBody}
           />
         ) : (
-          <h3 className="min-w-0 flex-1 truncate px-2 py-1 text-base font-semibold text-stone-900">
-            {prompt.label}
-          </h3>
-        )}
-        {prompt.is_default && (
-          <span className="rounded-full bg-dark-blue/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-dark-blue">
-            Default
-          </span>
-        )}
-        <span className="rounded-full border border-stone-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
-          {isSummary ? "Summary" : "System"}
-        </span>
-        <div className="text-[11px] text-stone-500">
-          {isSummary
-            ? "Used after every reflection completes"
-            : `Used on ${assignmentsUsing} assignment${
-                assignmentsUsing === 1 ? "" : "s"
-              } (across all teachers)`}
-          {!isSummary && policiesUsing > 0 && (
-            <>
-              {" "}
-              · default for {policiesUsing} course
-              {policiesUsing === 1 ? "" : "s"}
-            </>
-          )}
-        </div>
-        {!expanded && (
-          <button
-            type="button"
-            onClick={() => {
-              setExpanded(true);
-              setFeedback(null);
-            }}
-            className="rounded-sm border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-dark-blue hover:text-dark-blue"
-          >
-            Edit
-          </button>
-        )}
-      </header>
+          <div className="space-y-4 border-t border-stone-100 px-4 py-3">
+            {!isSummary && (
+              <div>
+                <label className="ehs-eyebrow mb-1.5 block text-stone-500">
+                  Student-facing question
+                </label>
+                <p className="mb-1.5 text-xs italic text-stone-500">
+                  What students see at the top of their reflection. Keep it
+                  short &mdash; a sentence or two.
+                </p>
+                <textarea
+                  ref={sfqRef}
+                  name="studentFacingQuestion"
+                  defaultValue={savedSFQ}
+                  placeholder="e.g. In at least 6 sentences, describe: how did you use AI in your process?..."
+                  rows={4}
+                  className="w-full resize-y rounded-sm border border-stone-300 bg-white px-3 py-2 font-document text-sm leading-relaxed focus:border-dark-blue"
+                />
+              </div>
+            )}
 
-      {!expanded ? (
-        <SystemPromptPreview
-          isSummary={isSummary}
-          studentFacingQuestion={prompt.student_facing_question ?? ""}
-          body={prompt.body}
-          feedback={feedback}
-        />
-      ) : (
-        <div className="space-y-4 border-t border-stone-100 px-4 py-3">
-          {!isSummary && (
             <div>
               <label className="ehs-eyebrow mb-1.5 block text-stone-500">
-                Student-facing question
+                {isSummary
+                  ? "Summary generation prompt"
+                  : "Coach instructions (system prompt)"}
               </label>
-              <p className="mb-1.5 text-xs italic text-stone-500">
-                What students see at the top of their reflection. Keep it short
-                &mdash; a sentence or two.
-              </p>
+              {!isSummary && (
+                <p className="mb-1.5 text-xs italic text-stone-500">
+                  Instructions for the AI coach. Not shown to students.
+                </p>
+              )}
               <textarea
-                value={studentFacingQuestion}
-                onChange={(e) => setStudentFacingQuestion(e.target.value)}
-                placeholder="e.g. In at least 6 sentences, describe: how did you use AI in your process?..."
-                rows={4}
-                className="w-full resize-y rounded-sm border border-stone-300 bg-white px-3 py-2 font-document text-sm leading-relaxed focus:border-dark-blue"
+                ref={bodyRef}
+                name="body"
+                defaultValue={savedBody}
+                rows={18}
+                spellCheck={false}
+                className="w-full resize-y rounded-sm border border-stone-300 bg-white px-3 py-2 font-mono text-xs leading-relaxed shadow-inner focus:border-dark-blue"
               />
             </div>
-          )}
 
-          <div>
-            <label className="ehs-eyebrow mb-1.5 block text-stone-500">
-              {isSummary
-                ? "Summary generation prompt"
-                : "Coach instructions (system prompt)"}
-            </label>
-            {!isSummary && (
-              <p className="mb-1.5 text-xs italic text-stone-500">
-                Instructions for the AI coach. Not shown to students.
-              </p>
-            )}
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={18}
-              spellCheck={false}
-              className="w-full resize-y rounded-sm border border-stone-300 bg-white px-3 py-2 font-mono text-xs leading-relaxed shadow-inner focus:border-dark-blue"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!dirty || pending}
-              className="rounded-sm bg-dark-blue px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-dark-blue-dark disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
-            >
-              {pending ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLabel(prompt.label);
-                setBody(prompt.body);
-                setStudentFacingQuestion(prompt.student_facing_question ?? "");
-                setFeedback(null);
-                setExpanded(false);
-              }}
-              disabled={pending}
-              className="rounded-sm px-2 py-1 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-50"
-            >
-              {dirty ? "Discard changes" : "Cancel"}
-            </button>
             {!prompt.is_default && !isSummary && (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
                 {confirmDelete ? (
                   <>
                     <span className="text-[11px] text-red-700">
@@ -242,17 +259,8 @@ export function SystemPromptCard({
               </div>
             )}
           </div>
-          {feedback && (
-            <div
-              className={`text-xs ${
-                feedback.kind === "ok" ? "text-emerald-700" : "text-red-700"
-              }`}
-            >
-              {feedback.message}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </form>
     </section>
   );
 }
@@ -264,46 +272,26 @@ function SystemPromptPreview({
   isSummary,
   studentFacingQuestion,
   body,
-  feedback,
 }: {
   isSummary: boolean;
   studentFacingQuestion: string;
   body: string;
-  feedback:
-    | null
-    | { kind: "ok"; message: string }
-    | { kind: "error"; message: string };
 }) {
-  const previewText = isSummary
-    ? body.trim()
-    : studentFacingQuestion.trim();
+  const previewText = isSummary ? body.trim() : studentFacingQuestion.trim();
   const previewLabel = isSummary
     ? "Summary generation prompt"
     : "Student-facing question";
-  if (!previewText && !feedback) return null;
+  if (!previewText) return null;
   return (
     <div className="border-t border-stone-100 px-4 py-3">
-      {previewText && (
-        <>
-          <div className="ehs-eyebrow mb-1 text-stone-500">{previewLabel}</div>
-          <p
-            className={`line-clamp-2 text-sm leading-relaxed text-stone-700 ${
-              isSummary ? "font-mono text-xs" : "font-document"
-            }`}
-          >
-            {previewText}
-          </p>
-        </>
-      )}
-      {feedback && (
-        <div
-          className={`mt-2 text-xs ${
-            feedback.kind === "ok" ? "text-emerald-700" : "text-red-700"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
+      <div className="ehs-eyebrow mb-1 text-stone-500">{previewLabel}</div>
+      <p
+        className={`line-clamp-2 text-sm leading-relaxed text-stone-700 ${
+          isSummary ? "font-mono text-xs" : "font-document"
+        }`}
+      >
+        {previewText}
+      </p>
     </div>
   );
 }

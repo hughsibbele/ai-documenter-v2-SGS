@@ -1,6 +1,7 @@
 import { createAdminDbClient } from "@ai-documenter/db/admin";
 import { SystemPromptCard } from "./SystemPromptCard";
 import { NewSystemPromptForm } from "./NewSystemPromptForm";
+import { AutoSaveProvider } from "@/components/auto-save/context";
 
 export default async function AdminPromptsPage() {
   // Service-role read so we get cross-teacher counts.
@@ -39,6 +40,7 @@ export default async function AdminPromptsPage() {
   }
 
   return (
+    <AutoSaveProvider>
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">System prompts</h1>
@@ -100,5 +102,6 @@ export default async function AdminPromptsPage() {
         )}
       </section>
     </div>
+    </AutoSaveProvider>
   );
 }
