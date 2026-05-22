@@ -73,7 +73,7 @@ export async function nextSocraticTurn(
   const { data: session } = await admin
     .from("reflection_sessions")
     .select(
-      "id, state, reflection_messages, ai_chats, paste_fallback_text, first_draft, objective_summary",
+      "id, state, reflection_messages, ai_chats, paste_fallback_text, first_draft, objective_summary, prompt_body_snapshot, roster_snapshot",
     )
     .eq("teacher_assignment_id", ctx.teacherAssignment.id)
     .eq("student_id", student.id)
@@ -92,6 +92,12 @@ export async function nextSocraticTurn(
     (session.reflection_messages as ReflectionMessage[] | null) ?? [];
   const studentMsg = input.studentMessage.trim();
   const isDone = session.state === "completed" || session.state === "submitted";
+
+  // Phase 1: prefer the prompt body frozen at intake time. Mid-conversation
+  // teacher edits (auto-save commits every keystroke) cannot reach back and
+  // change what the Gemini system prompt is for this reflection. Legacy
+  // (pre-snapshot) sessions fall back to the live `prompts` row.
+  const promptBody = session.prompt_body_snapshot ?? ctx.prompt.body;
 
   // Idle resume.
   if (isDone || (studentMsg === "" && prior.length > 0)) {
@@ -121,21 +127,7 @@ export async function nextSocraticTurn(
     }
 
     const summaryRes = await generateObjectiveSummary({
-      session: {
-        ...scrubbedSession,
-        // Pad the rest of the session row for the type's sake; the helper
-        // only reads a subset.
-        ai_tools_used: null,
-        canvas_submission_id: null,
-        completed_at: null,
-        completion_code: "",
-        created_at: "",
-        expires_at: "",
-        student_id: student.id,
-        submitted_at: null,
-        teacher_assignment_id: ctx.teacherAssignment.id,
-        time_spent_estimate: null,
-      },
+      session: scrubbedSession,
       teacherId: ctx.teacherAssignment.teacher_id,
       anonToken: student.anon_token,
     });
@@ -148,7 +140,7 @@ export async function nextSocraticTurn(
 
     const alignmentRes = await generateCoachTurn({
       phase: "alignment_question",
-      promptBody: ctx.prompt.body,
+      promptBody,
       teacherId: ctx.teacherAssignment.teacher_id,
       anonToken: student.anon_token,
       contextSections: buildContextSections(scrubbedSession, summaryRes.summary),
@@ -223,7 +215,7 @@ export async function nextSocraticTurn(
     }
     const closingRes = await generateCoachTurn({
       phase: "closing",
-      promptBody: ctx.prompt.body,
+      promptBody,
       teacherId: ctx.teacherAssignment.teacher_id,
       anonToken: student.anon_token,
       contextSections: buildContextSections(

@@ -12,7 +12,15 @@ import {
   checkAndReserveGeminiCall,
 } from "@/lib/gemini/rate-limit";
 
-type ReflectionSession = Tables<"reflection_sessions">;
+// Only the fields buildSummaryInput actually reads — narrows the input so
+// callers don't have to pad the full ReflectionSession shape (audit L3).
+type SummarizableSession = Pick<
+  Tables<"reflection_sessions">,
+  | "first_draft"
+  | "paste_fallback_text"
+  | "ai_chats"
+  | "reflection_messages"
+>;
 
 export type ObjectiveSummaryInput = {
   /**
@@ -22,7 +30,7 @@ export type ObjectiveSummaryInput = {
    * explicit (and so preview flows that pass synthetic teacher-typed data
    * can opt out cleanly).
    */
-  session: ReflectionSession;
+  session: SummarizableSession;
   /** Owner of the teacher_assignment this session belongs to. Used to
    *  scope the daily Gemini-call cap. */
   teacherId: string;
@@ -134,7 +142,7 @@ export async function generateObjectiveSummary(
 // ---------------------------------------------------------------------------
 
 function buildSummaryInput(
-  session: ReflectionSession,
+  session: SummarizableSession,
   anonToken: string,
 ): string {
   const sections: string[] = [

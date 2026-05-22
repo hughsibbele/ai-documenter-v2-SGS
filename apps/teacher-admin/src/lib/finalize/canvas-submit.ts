@@ -147,13 +147,22 @@ export async function submitReflectionToCanvas(args: {
     pasteFallback,
   };
 
+  // Phase 1: prefer destination flags frozen at intake time. A teacher who
+  // flips between comment-mode and submission-mode while the student is
+  // mid-reflection shouldn't have the deliverable route change under them.
+  // Legacy (pre-snapshot) sessions fall back to the live teacher_assignments
+  // value, same as before Phase 1.
+  const postToCanvasSubmission =
+    session.post_to_canvas_submission_at_session ??
+    teacherAssignment.post_to_canvas_submission;
+
   // Default path: comment-only. The teacher's actual submission (essay, file,
   // discussion posts, etc.) stays as the canonical submission; our reflection
   // attaches as a side-channel comment. No body-POST attempted — if the
   // teacher wanted that path, they would have set
   // post_to_canvas_submission=true at install (M6.18a). The legacy column
   // `use_submission_body` is kept in sync at write time for one cycle.
-  if (!teacherAssignment.post_to_canvas_submission) {
+  if (!postToCanvasSubmission) {
     const textBody = buildSubmissionBodyText(bodyArgs);
     try {
       const { submissionId } = await postSubmissionCommentAsStudent(

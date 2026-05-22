@@ -2,7 +2,11 @@ import "server-only";
 
 import type { Json } from "@ai-documenter/db";
 import { scrubFreeText } from "@ai-documenter/anonymizer";
-import { compiledRosterForCourse, RosterMissingError } from "./roster-scrub";
+import {
+  compiledRosterForCourse,
+  compiledRosterFromSnapshot,
+  RosterMissingError,
+} from "./roster-scrub";
 
 export { RosterMissingError };
 
@@ -12,9 +16,16 @@ type AiChat = { tool: string; url: string; transcript_text: string | null };
  *  intersection so callers can pass a `select(...)`-narrowed row without
  *  reshaping it. */
 type Scrubable<T> = T & {
+  id?: string;
   first_draft: string | null;
   paste_fallback_text: string | null;
   ai_chats: Json;
+  /** Phase 1: optional frozen roster captured at intake time. When present
+   *  the scrub compiles regexes from this rather than re-reading
+   *  `course_rosters` live, so a roster sync mid-reflection cannot widen the
+   *  scrub gap. Legacy (pre-Phase-1) sessions don't have it and fall back to
+   *  the per-course lookup. */
+  roster_snapshot?: Json | null;
 };
 
 /**
@@ -23,16 +34,25 @@ type Scrubable<T> = T & {
  * the two paths where real student names can leak in.
  *
  * Fail-closed (Phase 0): throws `RosterMissingError` if the roster isn't
- * available (no `course_rosters` row, empty roster, missing salt env, empty
- * canvasCourseId). Callers must catch and refuse to call Gemini. Previously
- * this function silently returned the session unchanged in those cases,
- * letting verbatim PII reach Gemini — the audit's headline finding.
+ * available. Callers must catch and refuse to call Gemini.
+ *
+ * Roster resolution order (Phase 1):
+ *   1. `session.roster_snapshot` — frozen at intake time, immutable for the
+ *      lifetime of the reflection.
+ *   2. Live `course_rosters` lookup by `canvasCourseId` — fallback for
+ *      legacy sessions created before the snapshot column landed.
  */
 export async function scrubSessionForGemini<T>(
   session: Scrubable<T>,
   canvasCourseId: string,
 ): Promise<Scrubable<T>> {
-  const compiled = await compiledRosterForCourse(canvasCourseId);
+  const compiled =
+    session.roster_snapshot != null
+      ? compiledRosterFromSnapshot(
+          session.roster_snapshot,
+          session.id ?? "(unknown)",
+        )
+      : await compiledRosterForCourse(canvasCourseId);
 
   const aiChats = ((session.ai_chats as AiChat[] | null) ?? []).map((c) => ({
     ...c,

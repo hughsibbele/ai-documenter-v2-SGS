@@ -388,6 +388,7 @@ export type Database = {
           ai_chats: Json
           ai_tools_used: string[] | null
           canvas_submission_id: string | null
+          card_text_snapshot: Json | null
           completed_at: string | null
           completion_code: string
           created_at: string
@@ -396,8 +397,15 @@ export type Database = {
           id: string
           objective_summary: string | null
           paste_fallback_text: string | null
+          post_to_canvas_comment_at_session: boolean | null
+          post_to_canvas_submission_at_session: boolean | null
+          post_to_drive_at_session: boolean | null
+          prompt_body_snapshot: string | null
           reflection_messages: Json
+          roster_snapshot: Json | null
+          scrub_status: string
           state: Database["public"]["Enums"]["reflection_state"]
+          student_facing_question_snapshot: string | null
           student_id: string
           submitted_at: string | null
           teacher_assignment_id: string
@@ -407,6 +415,7 @@ export type Database = {
           ai_chats?: Json
           ai_tools_used?: string[] | null
           canvas_submission_id?: string | null
+          card_text_snapshot?: Json | null
           completed_at?: string | null
           completion_code: string
           created_at?: string
@@ -415,8 +424,15 @@ export type Database = {
           id?: string
           objective_summary?: string | null
           paste_fallback_text?: string | null
+          post_to_canvas_comment_at_session?: boolean | null
+          post_to_canvas_submission_at_session?: boolean | null
+          post_to_drive_at_session?: boolean | null
+          prompt_body_snapshot?: string | null
           reflection_messages?: Json
+          roster_snapshot?: Json | null
+          scrub_status?: string
           state?: Database["public"]["Enums"]["reflection_state"]
+          student_facing_question_snapshot?: string | null
           student_id: string
           submitted_at?: string | null
           teacher_assignment_id: string
@@ -426,6 +442,7 @@ export type Database = {
           ai_chats?: Json
           ai_tools_used?: string[] | null
           canvas_submission_id?: string | null
+          card_text_snapshot?: Json | null
           completed_at?: string | null
           completion_code?: string
           created_at?: string
@@ -434,8 +451,15 @@ export type Database = {
           id?: string
           objective_summary?: string | null
           paste_fallback_text?: string | null
+          post_to_canvas_comment_at_session?: boolean | null
+          post_to_canvas_submission_at_session?: boolean | null
+          post_to_drive_at_session?: boolean | null
+          prompt_body_snapshot?: string | null
           reflection_messages?: Json
+          roster_snapshot?: Json | null
+          scrub_status?: string
           state?: Database["public"]["Enums"]["reflection_state"]
+          student_facing_question_snapshot?: string | null
           student_id?: string
           submitted_at?: string | null
           teacher_assignment_id?: string

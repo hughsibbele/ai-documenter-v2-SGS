@@ -4,6 +4,11 @@ import { randomBytes } from "node:crypto";
 import { createAdminDbClient } from "@ai-documenter/db/admin";
 import { getServerDbClient } from "@/lib/supabase/server";
 import { resolveIframeToken } from "@/lib/iframe/resolve";
+import { resolveCardTextForTeacher } from "@/lib/card-text/resolve";
+import {
+  loadRawRosterForCourse,
+  RosterMissingError,
+} from "@/lib/scrub/roster-scrub";
 
 export type SubmitIntakeInput = {
   iframeToken: string;
@@ -99,6 +104,34 @@ export async function submitIntake(
     return { ok: false, error: "Your student account isn't set up yet." };
   }
 
+  // Phase 1: snapshot the roster + card text + destination flags +
+  // prompt body at intake time. Reads from these snapshots throughout the
+  // session lifecycle (socratic.ts for Gemini calls, finalize.ts for
+  // destination routing, scrub for PII) so a teacher edit / roster sync
+  // mid-reflection cannot retroactively change what the reflection meant.
+  //
+  // Fail-closed: if the roster lookup throws RosterMissingError, refuse
+  // to create the session (same Phase 0 contract). The student gets a
+  // clear "tell your teacher" message; no half-snapshotted row lands.
+  let rosterSnapshot;
+  try {
+    rosterSnapshot = await loadRawRosterForCourse(
+      ctx.teacherAssignment.canvas_course_id,
+    );
+  } catch (err) {
+    if (err instanceof RosterMissingError) {
+      console.warn(
+        `[submitIntake] roster_missing teacher_assignment=${ctx.teacherAssignment.id} reason=${err.reason}`,
+      );
+      return { ok: false, error: "roster_missing" };
+    }
+    throw err;
+  }
+
+  const cardText = await resolveCardTextForTeacher(
+    ctx.teacherAssignment.teacher_id,
+  );
+
   // Insert with a freshly-generated completion_code; retry once on the
   // (extremely unlikely) collision.
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -119,6 +152,23 @@ export async function submitIntake(
         ai_tools_used: Array.from(new Set(cleanedChats.map((c) => c.tool))),
         first_draft: firstDraft,
         completion_code: completionCode,
+        // Phase 1 snapshots — frozen for the lifetime of the session.
+        prompt_body_snapshot: ctx.prompt.body,
+        student_facing_question_snapshot:
+          ctx.prompt.student_facing_question ?? null,
+        card_text_snapshot: {
+          kicker: cardText.kicker,
+          title: cardText.title,
+          body: cardText.body,
+          cta_label: cardText.ctaLabel,
+          footnote: cardText.footnote,
+        },
+        post_to_canvas_comment_at_session:
+          ctx.teacherAssignment.post_to_canvas_comment,
+        post_to_canvas_submission_at_session:
+          ctx.teacherAssignment.post_to_canvas_submission,
+        post_to_drive_at_session: ctx.teacherAssignment.post_to_drive,
+        roster_snapshot: rosterSnapshot,
       })
       .select("id")
       .single();
