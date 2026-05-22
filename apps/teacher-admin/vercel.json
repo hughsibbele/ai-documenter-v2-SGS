@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/sync-all-teachers",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/sweep-sessions",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -115,7 +115,13 @@ function serializeForClient(
 
 export type SerializedReflection = {
   sessionId: string;
-  state: "started" | "in_progress" | "completed" | "submitted" | "failed";
+  state:
+    | "started"
+    | "in_progress"
+    | "completed"
+    | "submitted"
+    | "failed"
+    | "archived";
   createdAt: string;
   completedAt: string | null;
   submittedAt: string | null;
