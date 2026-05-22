@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminDbClient } from "@ai-documenter/db/admin";
+import type { Json } from "@ai-documenter/db";
 import { getServerDbClient } from "@/lib/supabase/server";
 import { resolveIframeToken } from "@/lib/iframe/resolve";
 import { generateObjectiveSummary } from "@/lib/finalize/objective-summary";
@@ -159,13 +160,23 @@ export async function nextSocraticTurn(
       { role: "ai", text: alignmentRes.text, ts: now },
     ];
 
-    await admin
-      .from("reflection_sessions")
-      .update({
-        reflection_messages: newMessages,
-        objective_summary: summaryRes.summary,
-      })
-      .eq("id", session.id);
+    // Phase 2: atomic state-fenced advance. If another caller raced this
+    // bootstrap (e.g., a page refresh during the 5–10s Gemini call), the
+    // RPC's expected_length=0 fence will fail and we'll return the
+    // existing row's state instead of clobbering it.
+    const applied = await advanceTurn(admin, {
+      sessionId: session.id,
+      expectedLength: 0,
+      newMessages,
+      newState: "in_progress",
+      objectiveSummary: summaryRes.summary,
+    });
+    if (!applied) {
+      console.warn(
+        `[nextSocraticTurn bootstrap] no_op session=${session.id} — another caller advanced first`,
+      );
+      return await reReadAndReturn(admin, session.id);
+    }
 
     return {
       ok: true,
@@ -183,10 +194,18 @@ export async function nextSocraticTurn(
       { role: "student", text: studentMsg, ts: now },
       { role: "ai", text: HARDCODED_FINAL_QUESTION, ts: now },
     ];
-    await admin
-      .from("reflection_sessions")
-      .update({ reflection_messages: newMessages })
-      .eq("id", session.id);
+    const applied = await advanceTurn(admin, {
+      sessionId: session.id,
+      expectedLength: 2,
+      newMessages,
+      newState: "in_progress",
+    });
+    if (!applied) {
+      console.warn(
+        `[nextSocraticTurn Q1->Q2] no_op session=${session.id} — another caller advanced first`,
+      );
+      return await reReadAndReturn(admin, session.id);
+    }
     return { ok: true, messages: newMessages, conversationDone: false };
   }
 
@@ -236,14 +255,19 @@ export async function nextSocraticTurn(
           ts: now,
         },
       ];
-      await admin
-        .from("reflection_sessions")
-        .update({
-          reflection_messages: finalMessages,
-          state: "completed",
-          completed_at: now,
-        })
-        .eq("id", session.id);
+      const applied = await advanceTurn(admin, {
+        sessionId: session.id,
+        expectedLength: 4,
+        newMessages: finalMessages,
+        newState: "completed",
+        completedAt: now,
+      });
+      if (!applied) {
+        console.warn(
+          `[nextSocraticTurn closing-fallback] no_op session=${session.id} — another caller advanced first`,
+        );
+        return await reReadAndReturn(admin, session.id);
+      }
       return { ok: true, messages: finalMessages, conversationDone: true };
     }
 
@@ -251,17 +275,87 @@ export async function nextSocraticTurn(
       ...withStudent,
       { role: "ai", text: closingRes.text, ts: now },
     ];
-    await admin
-      .from("reflection_sessions")
-      .update({
-        reflection_messages: finalMessages,
-        state: "completed",
-        completed_at: now,
-      })
-      .eq("id", session.id);
+    const applied = await advanceTurn(admin, {
+      sessionId: session.id,
+      expectedLength: 4,
+      newMessages: finalMessages,
+      newState: "completed",
+      completedAt: now,
+    });
+    if (!applied) {
+      console.warn(
+        `[nextSocraticTurn closing] no_op session=${session.id} — another caller advanced first`,
+      );
+      return await reReadAndReturn(admin, session.id);
+    }
     return { ok: true, messages: finalMessages, conversationDone: true };
   }
 
   // Fallback: unknown state — just return what we have.
   return { ok: true, messages: prior, conversationDone: isDone };
+}
+
+// ---------------------------------------------------------------------------
+
+type AdvanceArgs = {
+  sessionId: string;
+  expectedLength: number;
+  newMessages: ReflectionMessage[];
+  newState: "in_progress" | "completed";
+  objectiveSummary?: string;
+  completedAt?: string;
+};
+
+/**
+ * Phase 2: invoke the advance_socratic_turn RPC. Returns true when the
+ * UPDATE applied (we hold the advance), false when another caller raced us
+ * and the row's length/state no longer match the expected fence.
+ */
+async function advanceTurn(
+  admin: ReturnType<typeof createAdminDbClient>,
+  args: AdvanceArgs,
+): Promise<boolean> {
+  const { data, error } = await admin.rpc("advance_socratic_turn", {
+    p_session_id: args.sessionId,
+    p_expected_length: args.expectedLength,
+    p_new_messages: args.newMessages as unknown as Json,
+    p_new_state: args.newState,
+    p_objective_summary: args.objectiveSummary,
+    p_completed_at: args.completedAt,
+  });
+  if (error) {
+    throw new Error(`advance_socratic_turn rpc failed: ${error.message}`);
+  }
+  return (data ?? 0) > 0;
+}
+
+/**
+ * Phase 2: idempotent recovery path when the advance fence rejects our
+ * write because another caller (refresh, retry, visibilitychange) advanced
+ * first. Re-reads the row and returns whatever its current state encodes,
+ * so the caller's UX renders the winning payload instead of erroring or
+ * looping.
+ */
+async function reReadAndReturn(
+  admin: ReturnType<typeof createAdminDbClient>,
+  sessionId: string,
+): Promise<SocraticTurnResult> {
+  const { data: fresh } = await admin
+    .from("reflection_sessions")
+    .select("state, reflection_messages, objective_summary")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!fresh) {
+    return { ok: false, error: "Session disappeared during advance." };
+  }
+  const messages =
+    (fresh.reflection_messages as ReflectionMessage[] | null) ?? [];
+  const isDone =
+    fresh.state === "completed" || fresh.state === "submitted";
+  return {
+    ok: true,
+    messages,
+    conversationDone: isDone,
+    objectiveSummary: fresh.objective_summary ?? undefined,
+  };
 }

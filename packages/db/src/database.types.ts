@@ -678,6 +678,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_socratic_turn: {
+        Args: {
+          p_completed_at?: string
+          p_expected_length: number
+          p_new_messages: Json
+          p_new_state: Database["public"]["Enums"]["reflection_state"]
+          p_objective_summary?: string
+          p_session_id: string
+        }
+        Returns: number
+      }
       check_and_increment_gemini_call: {
         Args: { p_default_cap: number; p_teacher_id: string }
         Returns: {

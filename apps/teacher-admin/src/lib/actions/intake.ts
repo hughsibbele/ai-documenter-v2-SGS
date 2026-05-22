@@ -104,6 +104,28 @@ export async function submitIntake(
     return { ok: false, error: "Your student account isn't set up yet." };
   }
 
+  // Phase 2 idempotent intake. The partial unique index
+  // reflection_sessions_active_per_assignment_uidx (Phase 2 migration)
+  // prevents two concurrent submitIntake calls from minting two sessions
+  // for the same (teacher_assignment, student); the second sees a 23505.
+  // Check up front and return the existing row's id so:
+  //   - a refresh after the response was lost gets the right session
+  //   - a devtools replay can't bury a finalized reflection under a fresh
+  //     row (audit C2)
+  //   - the 23505 path becomes a recovery branch, not an error
+  const { data: existing } = await admin
+    .from("reflection_sessions")
+    .select("id, state")
+    .eq("teacher_assignment_id", ctx.teacherAssignment.id)
+    .eq("student_id", student.id)
+    .in("state", ["in_progress", "completed", "submitted"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existing) {
+    return { ok: true, sessionId: existing.id };
+  }
+
   // Phase 1: snapshot the roster + card text + destination flags +
   // prompt body at intake time. Reads from these snapshots throughout the
   // session lifecycle (socratic.ts for Gemini calls, finalize.ts for
@@ -177,9 +199,31 @@ export async function submitIntake(
       return { ok: true, sessionId: data.id };
     }
 
-    const isUniqueViolation =
+    // Phase 2: a 23505 on the partial unique index means another caller
+    // (refresh, devtools replay, retry storm) raced us. Re-lookup and
+    // return the existing session id rather than failing.
+    if (
+      error?.code === "23505" &&
+      error.message.includes("reflection_sessions_active_per_assignment_uidx")
+    ) {
+      const { data: existing2 } = await admin
+        .from("reflection_sessions")
+        .select("id")
+        .eq("teacher_assignment_id", ctx.teacherAssignment.id)
+        .eq("student_id", student.id)
+        .in("state", ["in_progress", "completed", "submitted"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existing2) {
+        return { ok: true, sessionId: existing2.id };
+      }
+      // Fell through somehow; fall back to the generic error below.
+    }
+
+    const isCompletionCodeCollision =
       error?.code === "23505" && error.message.includes("completion_code");
-    if (!isUniqueViolation) {
+    if (!isCompletionCodeCollision) {
       return {
         ok: false,
         error: `Couldn't save your reflection: ${error?.message ?? "unknown"}`,

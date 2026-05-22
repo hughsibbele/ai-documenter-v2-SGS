@@ -37,6 +37,20 @@ export async function resendToCanvas(
     return { ok: false, message: "Couldn't find that reflection." };
   }
 
+  // Phase 2 state fence: refuse to re-POST if the row is already in
+  // 'submitted' with a canvas_submission_id. The original audit C3 case
+  // — teacher re-clicks Resend → duplicate gradebook comment / body
+  // overwrite — closes here. The remaining valid resend targets are
+  // 'failed' (Canvas POST errored) and 'completed' (finalize never
+  // landed for some reason).
+  if (session.state === "submitted" && session.canvas_submission_id) {
+    return {
+      ok: false,
+      message:
+        "This reflection has already been submitted to Canvas. Refresh to see the current state.",
+    };
+  }
+
   const { data: ta } = await admin
     .from("teacher_assignments")
     .select("*")

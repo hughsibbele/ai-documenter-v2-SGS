@@ -172,7 +172,19 @@ export async function submitReflectionToCanvas(args: {
         canvasUserId,
         textBody,
       );
-      await persistSuccess(admin, session.id, submissionId, "comment");
+      const persisted = await persistSuccess(
+        admin,
+        session.id,
+        submissionId,
+        "comment",
+      );
+      if (!persisted.ok) {
+        return {
+          ok: false,
+          error: persisted.error,
+          needsCompletionCode: true,
+        };
+      }
       return { ok: true, submissionId, canvasUserId };
     } catch (err) {
       const message = buildErrorMessage(err);
@@ -193,7 +205,19 @@ export async function submitReflectionToCanvas(args: {
       canvasUserId,
       htmlBody,
     );
-    await persistSuccess(admin, session.id, submissionId, "submission");
+    const persisted = await persistSuccess(
+      admin,
+      session.id,
+      submissionId,
+      "submission",
+    );
+    if (!persisted.ok) {
+      return {
+        ok: false,
+        error: persisted.error,
+        needsCompletionCode: true,
+      };
+    }
     return { ok: true, submissionId, canvasUserId };
   } catch (err) {
     // 400/422 = submission_types[] doesn't include online_text_entry. Other
@@ -223,7 +247,19 @@ export async function submitReflectionToCanvas(args: {
       canvasUserId,
       textBody,
     );
-    await persistSuccess(admin, session.id, submissionId, "comment");
+    const persisted = await persistSuccess(
+      admin,
+      session.id,
+      submissionId,
+      "comment",
+    );
+    if (!persisted.ok) {
+      return {
+        ok: false,
+        error: persisted.error,
+        needsCompletionCode: true,
+      };
+    }
     return { ok: true, submissionId, canvasUserId };
   } catch (err) {
     const message = `Comment fallback also failed. ${buildErrorMessage(err)}`;
@@ -232,29 +268,58 @@ export async function submitReflectionToCanvas(args: {
   }
 }
 
+/**
+ * Phase 2: record a successful Canvas write as state='submitted' +
+ * canvas_submission_id. Returns true if the local UPDATE applied, false
+ * if the row had already been advanced past 'completed' (e.g., a
+ * concurrent finalize beat us). Bubbles a DB error up so the caller can
+ * surface the "Canvas accepted but local state diverged" case and avoid
+ * re-POSTing on retry — the prior behavior silently returned ok:true
+ * and a subsequent finalize would double-post a comment to SpeedGrader
+ * (audit C4 / H5).
+ */
 async function persistSuccess(
   admin: ReturnType<typeof createAdminDbClient>,
   sessionId: string,
   submissionId: number,
   via: "submission" | "comment",
-): Promise<void> {
-  const { error: updateError } = await admin
+): Promise<{ ok: true; appliedHere: boolean } | { ok: false; error: string }> {
+  // State-fenced UPDATE: only advance 'completed' → 'submitted'. Asking
+  // for the affected rows lets us distinguish "we wrote it" from "another
+  // caller already submitted this row".
+  const { data: updatedRows, error: updateError } = await admin
     .from("reflection_sessions")
     .update({
       canvas_submission_id: String(submissionId),
       state: "submitted",
       submitted_at: new Date().toISOString(),
     })
-    .eq("id", sessionId);
+    .eq("id", sessionId)
+    .eq("state", "completed")
+    .select("id");
 
   if (updateError) {
-    // Canvas accepted but we couldn't record it. Don't fail the student —
-    // they still got credit. Log the discrepancy.
+    // Canvas accepted, DB UPDATE errored. We can't return ok-success here
+    // — a retry would re-POST and SpeedGrader would show duplicate comments.
+    const message = `Canvas accepted (via ${via}) but local update failed: ${updateError.message}`;
+    await logAttempt(admin, sessionId, true, message);
+    return { ok: false, error: message };
+  }
+
+  const appliedHere = (updatedRows?.length ?? 0) > 0;
+  if (!appliedHere) {
+    // Another caller already finalized this session. Canvas now has TWO
+    // submissions for the same student (ours + theirs). Log loudly so we
+    // can find these in monitoring; the student already got credit on the
+    // first call so no need to fail the UX.
+    console.warn(
+      `[persistSuccess] duplicate Canvas write detected session=${sessionId} submission=${submissionId} via=${via} — another caller already submitted`,
+    );
     await logAttempt(
       admin,
       sessionId,
       true,
-      `Canvas accepted (via ${via}) but local update failed: ${updateError.message}`,
+      `Canvas accepted (via ${via}) but session was already submitted by a concurrent caller (DUPLICATE)`,
     );
   } else {
     await logAttempt(
@@ -264,6 +329,7 @@ async function persistSuccess(
       via === "comment" ? "Submitted via comment fallback." : null,
     );
   }
+  return { ok: true, appliedHere };
 }
 
 function buildErrorMessage(err: unknown): string {

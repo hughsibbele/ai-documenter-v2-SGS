@@ -135,13 +135,20 @@ export async function finalizeReflection(
   );
 
   if (scope.in_scope) {
+    // Phase 2: state-fenced UPDATE. A concurrent finalize call (refresh
+    // during the 10-15s Canvas POST, browser auto-retry, visibilitychange
+    // collision) won't re-flip the row's state if it's already moved past
+    // 'completed' — the fence treats zero-rows-affected as "another caller
+    // beat us, the row already says what we wanted to write" and we just
+    // return the existing state via the next select.
     await admin
       .from("reflection_sessions")
       .update({
         state: "submitted",
         submitted_at: new Date().toISOString(),
       })
-      .eq("id", session.id);
+      .eq("id", session.id)
+      .eq("state", "completed");
 
     const { data: refreshedSession } = await admin
       .from("reflection_sessions")
@@ -225,12 +232,15 @@ export async function finalizeReflection(
   }
 
   // 8. If Canvas failed but completed_at is set, mark session state='failed'
-  //    so the dashboard can flag it for the teacher.
+  //    so the dashboard can flag it for the teacher. Phase 2 state fence:
+  //    only flip 'completed' → 'failed'. A concurrent finalize that DID
+  //    succeed and moved the row to 'submitted' must win.
   if (!canvasResult.ok && refreshedSession?.state !== "submitted") {
     await admin
       .from("reflection_sessions")
       .update({ state: "failed" })
-      .eq("id", session.id);
+      .eq("id", session.id)
+      .eq("state", "completed");
   }
 
   return {
