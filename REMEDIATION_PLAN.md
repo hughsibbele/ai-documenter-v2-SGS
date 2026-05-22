@@ -13,14 +13,14 @@ The audits identified the same five recurring root causes as the OE M6.19 review
 
 ## Status (as of 2026-05-21)
 
-All phases pending. The critical path is **0 → 1 → 2 → 3**, identical to OE's M6.19 cadence (which shipped in 4 sequential commits over a day). Phases 4–9 are independent and can run in any order once the critical path lands.
+Critical path **0 → 1 → 2 → 3** shipped on 2026-05-21. Phases 4–9 are independent and can run in any order.
 
 | Phase | State | Commit |
 |---|---|---|
-| 0 — Stop the PII bleed | Pending | — |
-| 1 — Snapshot semantics on session start | Pending | — |
-| 2 — State fences + idempotent intake / bootstrap / turn / finalize | Pending | — |
-| 3 — Stale-session sweep + retention cron | Pending | — |
+| 0 — Stop the PII bleed | Done | AID `685b643` |
+| 1 — Snapshot semantics on session start | Done | AID `ecc3abd` + migration `20260521130000` |
+| 2 — State fences + idempotent intake / bootstrap / turn / finalize | Done | AID `d78e7b7` + migration `20260521140000` |
+| 3 — Stale-session sweep + retention cron | Done | AID `deaa802` + migration `20260521150000` |
 | 4 — Auto-save normalization (close CLAUDE.md regressions) | Pending | — |
 | 5 — Canvas client robustness | Pending | — |
 | 6 — Auth boundary + role separation | Pending | — |
