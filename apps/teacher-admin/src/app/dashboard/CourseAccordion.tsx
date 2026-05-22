@@ -395,6 +395,19 @@ function BulkActions({
     (a) => a.install?.status === "installed",
   );
 
+  // M3.8 / M6.18b: when every selected assignment is in super-grader's
+  // scope, SG owns the Canvas write — disable the Canvas checkboxes to
+  // mirror what AID actually does at finalize time. Drive stays
+  // toggleable. Effective values forced to off on install so the saved
+  // destination triple reflects reality.
+  const allInSuperGraderScope =
+    selectedAssignments.length > 0 &&
+    selectedAssignments.every((a) => a.inSuperGraderScope);
+  const someInSuperGraderScope =
+    selectedAssignments.some((a) => a.inSuperGraderScope);
+  const effectiveComment = allInSuperGraderScope ? false : postToComment;
+  const effectiveSubmission = allInSuperGraderScope ? false : postToSubmission;
+
   function run(op: "install" | "uninstall") {
     setResult(null);
     startTransition(async () => {
@@ -411,6 +424,24 @@ function BulkActions({
               },
             )
           : await uninstallFromAssignments(canvasCourseId, selectedIds);
+      setResult(r);
+      if (r.failureCount === 0) onClearSelection();
+    });
+  }
+
+  function runInstall() {
+    setResult(null);
+    startTransition(async () => {
+      const r = await installOnAssignments(
+        canvasCourseId,
+        selectedIds,
+        selectedPromptId,
+        {
+          drive: postToDrive,
+          comment: effectiveComment,
+          submission: effectiveSubmission,
+        },
+      );
       setResult(r);
       if (r.failureCount === 0) onClearSelection();
     });
@@ -452,17 +483,25 @@ function BulkActions({
         />
         <DestinationCheckbox
           label="Canvas as draft comment"
-          checked={postToComment}
+          checked={effectiveComment}
           onChange={setPostToComment}
-          disabled={pending}
-          title="Post the reflection as a draft submission comment, visible to you in SpeedGrader. Lowest risk — never overwrites the student's actual submission."
+          disabled={pending || allInSuperGraderScope}
+          title={
+            allInSuperGraderScope
+              ? "Routed via super-grader — SG owns the final Canvas post; AID will skip this write."
+              : "Post the reflection as a draft submission comment, visible to you in SpeedGrader. Lowest risk — never overwrites the student's actual submission."
+          }
         />
         <DestinationCheckbox
           label="Canvas as submission"
-          checked={postToSubmission}
+          checked={effectiveSubmission}
           onChange={setPostToSubmission}
-          disabled={pending}
-          title="Post the reflection as the student's submission body. Use only for assignments where the reflection IS the deliverable."
+          disabled={pending || allInSuperGraderScope}
+          title={
+            allInSuperGraderScope
+              ? "Routed via super-grader — SG owns the final Canvas post; AID will skip this write."
+              : "Post the reflection as the student's submission body. Use only for assignments where the reflection IS the deliverable."
+          }
         />
       </fieldset>
       <button
@@ -485,16 +524,18 @@ function BulkActions({
       )}
       <button
         type="button"
-        onClick={() => run("install")}
+        onClick={runInstall}
         disabled={
           pending ||
           !selectedPromptId ||
-          (!postToDrive && !postToComment && !postToSubmission)
+          (!postToDrive && !effectiveComment && !effectiveSubmission)
         }
         className="rounded-md bg-maroon px-3 py-1 font-semibold text-white hover:bg-maroon-dark disabled:opacity-50"
         title={
-          !postToDrive && !postToComment && !postToSubmission
-            ? "Pick at least one destination."
+          !postToDrive && !effectiveComment && !effectiveSubmission
+            ? allInSuperGraderScope
+              ? "Routed via super-grader — Drive write is the only remaining destination; turn it on or remove from SG scope."
+              : "Pick at least one destination."
             : undefined
         }
       >
@@ -508,9 +549,19 @@ function BulkActions({
       <p className="basis-full text-[11px] italic text-stone-500">
         {describeDestination({
           drive: postToDrive,
-          comment: postToComment,
-          submission: postToSubmission,
+          comment: effectiveComment,
+          submission: effectiveSubmission,
         })}
+        {allInSuperGraderScope && (
+          <span className="ml-1 text-[#7a1e46] not-italic">
+            · routed via super-grader (Canvas write suppressed)
+          </span>
+        )}
+        {!allInSuperGraderScope && someInSuperGraderScope && (
+          <span className="ml-1 text-amber-700 not-italic">
+            · mixed scope — only some selected are in super-grader; review per-row
+          </span>
+        )}
       </p>
 
       {result && result.failureCount > 0 && (
