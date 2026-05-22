@@ -11,18 +11,21 @@ import {
   buildRateLimitMessage,
   checkAndReserveGeminiCall,
 } from "@/lib/gemini/rate-limit";
-import { scrubSessionForGemini } from "@/lib/scrub/session";
 
 type ReflectionSession = Tables<"reflection_sessions">;
 
 export type ObjectiveSummaryInput = {
+  /**
+   * The session to summarize. Caller is responsible for scrubbing free-text
+   * fields via `scrubSessionForGemini` BEFORE calling this — Phase 0 of the
+   * remediation plan moved the scrub to the caller so the boundary is
+   * explicit (and so preview flows that pass synthetic teacher-typed data
+   * can opt out cleanly).
+   */
   session: ReflectionSession;
   /** Owner of the teacher_assignment this session belongs to. Used to
    *  scope the daily Gemini-call cap. */
   teacherId: string;
-  /** Canvas course id — drives the roster-based free-text scrub of pasted
-   *  AI transcripts before content reaches Gemini. */
-  canvasCourseId: string;
   /**
    * Stable per-student Student_xxxxxx token. Plumbed in by the orchestrator
    * so the prompt has something to refer to the student by if it needs to
@@ -58,10 +61,9 @@ type ReflectionMessage = { role: "ai" | "student"; text: string; ts: string };
  *   - Gemini errors / empty response   → returns ok:false (rate-limit message
  *                                         if 429, otherwise the underlying message)
  *
- * Anonymization: structured PII is already absent from the session row
- * (display_name is never copied in). Free-text scrubbing of pasted AI
- * transcripts for stray student names is a separate Phase F follow-up
- * (needs the roster source); when it lands, it'll wrap the inputs here.
+ * Anonymization: free-text scrubbing happens at the caller (Phase 0 contract).
+ * Structured PII is already absent from the session row by construction
+ * (display_name is never copied in).
  */
 export async function generateObjectiveSummary(
   input: ObjectiveSummaryInput,
@@ -88,11 +90,7 @@ export async function generateObjectiveSummary(
     };
   }
 
-  const scrubbed = await scrubSessionForGemini(
-    input.session,
-    input.canvasCourseId,
-  );
-  const inputText = buildSummaryInput(scrubbed, input.anonToken);
+  const inputText = buildSummaryInput(input.session, input.anonToken);
   const messages: GeminiMessage[] = [{ role: "user", text: inputText }];
 
   const gate = await checkAndReserveGeminiCall(input.teacherId);

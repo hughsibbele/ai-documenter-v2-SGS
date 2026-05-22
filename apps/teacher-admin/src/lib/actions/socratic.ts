@@ -4,7 +4,7 @@ import { createAdminDbClient } from "@ai-documenter/db/admin";
 import { getServerDbClient } from "@/lib/supabase/server";
 import { resolveIframeToken } from "@/lib/iframe/resolve";
 import { generateObjectiveSummary } from "@/lib/finalize/objective-summary";
-import { scrubSessionForGemini } from "@/lib/scrub/session";
+import { RosterMissingError, scrubSessionForGemini } from "@/lib/scrub/session";
 import {
   buildContextSections,
   generateCoachTurn,
@@ -101,11 +101,24 @@ export async function nextSocraticTurn(
   // ---- Bootstrap: summary + alignment question ----
   if (prior.length === 0) {
     // Scrub free-text fields against the course roster once; both Gemini
-    // calls below see the same scrubbed view.
-    const scrubbedSession = await scrubSessionForGemini(
-      session,
-      ctx.teacherAssignment.canvas_course_id,
-    );
+    // calls below see the same scrubbed view. Phase 0: fail-closed —
+    // scrubSessionForGemini throws RosterMissingError when the roster isn't
+    // usable, and we refuse to call Gemini rather than ship raw PII.
+    let scrubbedSession;
+    try {
+      scrubbedSession = await scrubSessionForGemini(
+        session,
+        ctx.teacherAssignment.canvas_course_id,
+      );
+    } catch (err) {
+      if (err instanceof RosterMissingError) {
+        console.warn(
+          `[nextSocraticTurn bootstrap] roster_missing session=${session.id} reason=${err.reason}`,
+        );
+        return { ok: false, error: "roster_missing" };
+      }
+      throw err;
+    }
 
     const summaryRes = await generateObjectiveSummary({
       session: {
@@ -124,7 +137,6 @@ export async function nextSocraticTurn(
         time_spent_estimate: null,
       },
       teacherId: ctx.teacherAssignment.teacher_id,
-      canvasCourseId: ctx.teacherAssignment.canvas_course_id,
       anonToken: student.anon_token,
     });
     if (!summaryRes.ok) {
@@ -193,10 +205,22 @@ export async function nextSocraticTurn(
       ...prior,
       { role: "student", text: studentMsg, ts: now },
     ];
-    const scrubbedSession = await scrubSessionForGemini(
-      session,
-      ctx.teacherAssignment.canvas_course_id,
-    );
+    // Phase 0: fail-closed scrub before the closing Gemini call.
+    let scrubbedSession;
+    try {
+      scrubbedSession = await scrubSessionForGemini(
+        session,
+        ctx.teacherAssignment.canvas_course_id,
+      );
+    } catch (err) {
+      if (err instanceof RosterMissingError) {
+        console.warn(
+          `[nextSocraticTurn closing] roster_missing session=${session.id} reason=${err.reason}`,
+        );
+        return { ok: false, error: "roster_missing" };
+      }
+      throw err;
+    }
     const closingRes = await generateCoachTurn({
       phase: "closing",
       promptBody: ctx.prompt.body,

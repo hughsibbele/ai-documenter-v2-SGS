@@ -2,7 +2,9 @@ import "server-only";
 
 import type { Json } from "@ai-documenter/db";
 import { scrubFreeText } from "@ai-documenter/anonymizer";
-import { compiledRosterForCourse } from "./roster-scrub";
+import { compiledRosterForCourse, RosterMissingError } from "./roster-scrub";
+
+export { RosterMissingError };
 
 type AiChat = { tool: string; url: string; transcript_text: string | null };
 
@@ -20,19 +22,17 @@ type Scrubable<T> = T & {
  * course's roster — pasted AI transcripts and the first-draft paragraph are
  * the two paths where real student names can leak in.
  *
- * Structured PII (display_name, email) never enters the session row in the
- * first place; the anonymizer at the SSO boundary handles that. This is the
- * paranoid second layer for content the student typed or pasted themselves.
- *
- * No roster (empty `course_rosters` row, missing salt env, etc.) → returns
- * the session unchanged. Scrub is defense-in-depth, not a hard gate.
+ * Fail-closed (Phase 0): throws `RosterMissingError` if the roster isn't
+ * available (no `course_rosters` row, empty roster, missing salt env, empty
+ * canvasCourseId). Callers must catch and refuse to call Gemini. Previously
+ * this function silently returned the session unchanged in those cases,
+ * letting verbatim PII reach Gemini — the audit's headline finding.
  */
 export async function scrubSessionForGemini<T>(
   session: Scrubable<T>,
   canvasCourseId: string,
 ): Promise<Scrubable<T>> {
   const compiled = await compiledRosterForCourse(canvasCourseId);
-  if (compiled.variants.length === 0) return session;
 
   const aiChats = ((session.ai_chats as AiChat[] | null) ?? []).map((c) => ({
     ...c,

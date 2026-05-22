@@ -26,6 +26,18 @@ type Tool = "gemini" | "chatgpt" | "claude";
 type Chat = { tool: Tool; url: string };
 type TimeSpentBand = "lt15" | "15_30" | "30_45" | "45_60" | "1_2h" | "gt2h";
 
+// Map server-side error sentinels to student-facing copy. `roster_missing`
+// is the Phase 0 fail-closed signal: scrub couldn't run because the teacher's
+// course roster isn't synced or is empty. We refuse to call Gemini in that
+// state rather than leak PII; the student gets a calm message and the teacher
+// has to sync to unblock.
+function humanizeTurnError(error: string): string {
+  if (error === "roster_missing") {
+    return "We can't run this reflection right now — your teacher's class roster hasn't synced yet. Please tell your teacher to open AI Documenter and sync, then refresh this page.";
+  }
+  return error;
+}
+
 const TIME_BANDS: ReadonlyArray<{ value: TimeSpentBand; label: string }> = [
   { value: "lt15", label: "Less than 15 minutes" },
   { value: "15_30", label: "15–30 minutes" },
@@ -540,7 +552,7 @@ function ConversationScreen({
           setObjectiveSummary(res.objectiveSummary);
         }
       } else {
-        setLoadError(res.error);
+        setLoadError(humanizeTurnError(res.error));
       }
     });
   }, [iframeToken]);
@@ -601,7 +613,7 @@ function ConversationScreen({
         setDone(res.conversationDone);
       } else {
         setMessages(messages);
-        setTurnError(res.error);
+        setTurnError(humanizeTurnError(res.error));
         setDraft(text);
       }
     });

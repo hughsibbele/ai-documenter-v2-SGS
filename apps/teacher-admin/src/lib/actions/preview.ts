@@ -28,10 +28,11 @@ export type PreviewIntake = {
 };
 
 const PREVIEW_ANON_TOKEN = "Student_PREVIEW";
-// Fake course id: scrubSessionForGemini returns the session unchanged when
-// no roster row exists for the id. Belt-and-braces against any future change
-// that might try to look it up.
-const PREVIEW_COURSE_ID = "preview";
+// Preview is teacher-only and uses synthetic teacher-typed content — no
+// student PII to scrub. As of Phase 0 of REMEDIATION_PLAN.md, the scrub
+// boundary lives at the caller (in socratic.ts for real students) so we
+// simply don't invoke it here; generateObjectiveSummary no longer scrubs
+// internally either. Caller contract: pre-scrubbed (or scrub-exempt) session.
 
 // Shape generateObjectiveSummary expects. Mirrors the padding done at the
 // real call site in socratic.ts so the helper's type signature is satisfied.
@@ -113,7 +114,6 @@ export async function previewBootstrapReflection(input: {
   const summaryRes = await generateObjectiveSummary({
     session,
     teacherId: teacher.id,
-    canvasCourseId: PREVIEW_COURSE_ID,
     anonToken: PREVIEW_ANON_TOKEN,
   });
   if (!summaryRes.ok) {
