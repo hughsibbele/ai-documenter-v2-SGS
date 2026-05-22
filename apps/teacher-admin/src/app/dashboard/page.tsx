@@ -8,6 +8,7 @@ import { loadReflectionCountsByAssignment } from "@/lib/reviews/load";
 import { refreshCanvas } from "@/lib/actions/canvas-sync";
 import { CourseAccordion } from "./CourseAccordion";
 import { RefreshButton, SyncIndicator } from "./RefreshButton";
+import { bulkSuperGraderScope } from "@/lib/super-grader/scope";
 import type {
   AssignmentWithInstall,
   CourseGroup,
@@ -137,6 +138,14 @@ async function CourseList({
     promptOptions.map((p) => [p.id, p.label]),
   );
 
+  // Ask super-grader which assignments it's tracking. Parallel-N with a
+  // per-call 2.5s timeout + 5-min in-process cache; fail-open means a
+  // transient SG outage just defaults every assignment to scope=false (no
+  // badge, satellite keeps doing its normal Canvas write).
+  const sgScopeMap = await bulkSuperGraderScope(
+    assignments.map((a) => a.canvas_assignment_id),
+  );
+
   const allGroups: CourseGroup[] = courses
     .map((course) => {
       const courseAssignments: AssignmentWithInstall[] = assignments
@@ -154,6 +163,8 @@ async function CourseList({
             destination:
               destinationByCanvasAssignmentId.get(a.canvas_assignment_id) ??
               null,
+            inSuperGraderScope:
+              sgScopeMap.get(a.canvas_assignment_id)?.in_scope ?? false,
           };
         })
         .sort(byDueDateThenName);

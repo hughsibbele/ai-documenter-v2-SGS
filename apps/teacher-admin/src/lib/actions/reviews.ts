@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminDbClient } from "@ai-documenter/db/admin";
 import { getCurrentTeacher } from "@/lib/auth/teacher";
 import { submitReflectionToCanvas } from "@/lib/finalize/canvas-submit";
+import { isAssignmentInSuperGraderScope } from "@/lib/super-grader/scope";
 
 export type ResendToCanvasResult =
   | { ok: true; submissionId: number }
@@ -54,6 +55,18 @@ export async function resendToCanvas(
 
   if (!student) {
     return { ok: false, message: "Couldn't load the student." };
+  }
+
+  // Refuse the resend if super-grader is now tracking this assignment —
+  // super-grader owns the Canvas post, and retrying here would create a
+  // duplicate the moment the teacher posts via SG.
+  const scope = await isAssignmentInSuperGraderScope(ta.canvas_assignment_id);
+  if (scope.in_scope) {
+    return {
+      ok: false,
+      message:
+        "This assignment is routed via super-grader. Post the grade + comment from super-grader instead of resending here.",
+    };
   }
 
   const result = await submitReflectionToCanvas({

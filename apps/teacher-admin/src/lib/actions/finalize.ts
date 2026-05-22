@@ -5,6 +5,7 @@ import { getServerDbClient } from "@/lib/supabase/server";
 import { resolveIframeToken } from "@/lib/iframe/resolve";
 import { submitReflectionToCanvas } from "@/lib/finalize/canvas-submit";
 import { notifySuperGrader } from "@/lib/finalize/super-grader";
+import { isAssignmentInSuperGraderScope } from "@/lib/super-grader/scope";
 
 export type FinalizeReflectionInput = {
   iframeToken: string;
@@ -15,7 +16,12 @@ export type FinalizeReflectionResult =
       ok: true;
       /** True if Canvas accepted the auto-submission. */
       canvasSubmitted: boolean;
-      /** Always populated. Surface it to the student when canvasSubmitted=false. */
+      /** True when the assignment is in super-grader's scope and AID
+       *  deliberately skipped its own Canvas write — super-grader owns
+       *  the final Canvas post. Mutually exclusive with canvasSubmitted. */
+      routedViaSuperGrader: boolean;
+      /** Always populated. Surface it to the student when canvasSubmitted=false
+       *  AND routedViaSuperGrader=false (the genuine-failure case). */
       completionCode: string;
       /** Present when Canvas POST failed. */
       canvasError: string | null;
@@ -92,11 +98,14 @@ export async function finalizeReflection(
     };
   }
 
-  // Idempotent fast path: already submitted, no work to do.
-  if (session.state === "submitted" && session.canvas_submission_id) {
+  // Idempotent fast path: already submitted, no work to do. An SG-routed
+  // session is also state='submitted' but has no canvas_submission_id —
+  // distinguishable here so the response carries the right flag.
+  if (session.state === "submitted") {
     return {
       ok: true,
-      canvasSubmitted: true,
+      canvasSubmitted: Boolean(session.canvas_submission_id),
+      routedViaSuperGrader: !session.canvas_submission_id,
       completionCode: session.completion_code,
       canvasError: null,
       summaryGenerated: session.objective_summary !== null,
@@ -115,6 +124,58 @@ export async function finalizeReflection(
   }
 
   const summaryGenerated = session.objective_summary !== null;
+
+  // 3.5. Ask super-grader if it's tracking this assignment. When in scope,
+  //      super-grader owns the final Canvas post — we skip our own Canvas
+  //      write but still ship the envelope so SG has the data to post.
+  //      Fail-open: any error keeps us on the normal Canvas path so a
+  //      transient SG outage doesn't silently suppress submissions.
+  const scope = await isAssignmentInSuperGraderScope(
+    ctx.teacherAssignment.canvas_assignment_id,
+  );
+
+  if (scope.in_scope) {
+    await admin
+      .from("reflection_sessions")
+      .update({
+        state: "submitted",
+        submitted_at: new Date().toISOString(),
+      })
+      .eq("id", session.id);
+
+    const { data: refreshedSession } = await admin
+      .from("reflection_sessions")
+      .select("*")
+      .eq("id", session.id)
+      .single();
+
+    let webhookDelivered = false;
+    if (refreshedSession) {
+      const webhookResult = await notifySuperGrader({
+        session: refreshedSession,
+        teacher,
+        teacherAssignment: ctx.teacherAssignment,
+        student,
+      });
+      if (webhookResult.ok) {
+        webhookDelivered = true;
+      } else if (!webhookResult.skipped) {
+        console.error(
+          `[finalize] super-grader webhook failed for session ${session.id} (routed via SG): ${webhookResult.error}`,
+        );
+      }
+    }
+
+    return {
+      ok: true,
+      canvasSubmitted: false,
+      routedViaSuperGrader: true,
+      completionCode: session.completion_code,
+      canvasError: null,
+      summaryGenerated,
+      webhookDelivered,
+    };
+  }
 
   // 4. Submit to Canvas as the student.
   const canvasResult = await submitReflectionToCanvas({
@@ -175,6 +236,7 @@ export async function finalizeReflection(
   return {
     ok: true,
     canvasSubmitted: canvasResult.ok,
+    routedViaSuperGrader: false,
     completionCode: session.completion_code,
     canvasError: canvasResult.ok ? null : canvasResult.error,
     summaryGenerated,

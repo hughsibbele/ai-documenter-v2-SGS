@@ -28,6 +28,10 @@ export type AssignmentWithInstall = CanvasAssignmentCache & {
    *  the teacher selects a previously-installed row, falling back to
    *  per-app defaults otherwise. */
   destination: DestinationState | null;
+  /** True when super-grader is tracking this assignment. When true, AID
+   *  skips its own Canvas-write path (comment / submission body) — SG
+   *  owns the final post. Surfaced as a row badge in the dashboard. */
+  inSuperGraderScope: boolean;
 };
 
 export type CourseGroup = {

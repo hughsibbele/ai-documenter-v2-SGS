@@ -267,8 +267,20 @@ function AssignmentRow({
           )}
         </div>
       </div>
+      {assignment.inSuperGraderScope && <SuperGraderBadge />}
       <InstallStatusBadge assignment={assignment} />
     </li>
+  );
+}
+
+function SuperGraderBadge() {
+  return (
+    <span
+      className="shrink-0 rounded-full bg-[#7a1e46] px-2 py-0.5 text-[11px] font-medium text-white"
+      title="This assignment is tracked in super-grader. AID will skip its own Canvas submit — super-grader owns the final post."
+    >
+      ↗ super-grader
+    </span>
   );
 }
 
