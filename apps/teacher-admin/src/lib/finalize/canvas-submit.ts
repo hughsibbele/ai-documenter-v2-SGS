@@ -138,6 +138,11 @@ export async function submitReflectionToCanvas(args: {
   const objectiveSummary = session.objective_summary ?? "";
   const pasteFallback = session.paste_fallback_text ?? "";
 
+  // M7.3 — Drive doc URL (set by finalize.ts before this runs). When
+  // present, buildSubmissionBody/Text replaces the inline pasted
+  // transcript section with a "View full AI conversation (Drive)" link.
+  const driveDocUrl = session.drive_doc_url ?? null;
+
   const bodyArgs = {
     iframeToken: teacherAssignment.iframe_token,
     firstDraft,
@@ -145,6 +150,7 @@ export async function submitReflectionToCanvas(args: {
     reflectionMessages,
     aiChats,
     pasteFallback,
+    driveDocUrl,
   };
 
   // Phase 1: prefer destination flags frozen at intake time. A teacher who
@@ -373,6 +379,14 @@ export function buildSubmissionBody(args: {
   reflectionMessages: ReflectionMessage[];
   aiChats: AiChat[];
   pasteFallback: string;
+  /**
+   * M7.3 — when the reflection has been auto-saved to Drive, replace
+   * the inline "AI conversation (pasted)" section with a one-line
+   * link to the Drive doc. The doc contains the same content (plus
+   * objective summary + Q/A) — moving it out keeps the Canvas body
+   * focused on what the grader needs in-line.
+   */
+  driveDocUrl?: string | null;
 }): string {
   const parts: string[] = [];
   // Sentinel marker — super-grader's Canvas-scrape pipeline filters these so
@@ -437,7 +451,14 @@ export function buildSubmissionBody(args: {
     parts.push(rendered.join("\n"));
   }
 
-  if (args.pasteFallback.trim().length > 0) {
+  if (args.driveDocUrl) {
+    // M7.3 — Drive link replaces the inline pasted transcript. The
+    // teacher (and SG card) can follow the link for the full record.
+    parts.push(`<hr style="${RULE_STYLE}" />`);
+    parts.push(
+      `<p style="${BODY_STYLE}">📄 <a href="${escapeHtmlAttr(args.driveDocUrl)}">View full AI conversation (Drive)</a></p>`,
+    );
+  } else if (args.pasteFallback.trim().length > 0) {
     parts.push(`<hr style="${RULE_STYLE}" />`);
     parts.push(`<h4 style="${HEADING_STYLE}">AI conversation (pasted)</h4>`);
     parts.push(
@@ -500,6 +521,8 @@ function buildSubmissionBodyText(args: {
   reflectionMessages: ReflectionMessage[];
   aiChats: AiChat[];
   pasteFallback: string;
+  /** M7.3 — when set, replaces the inline pasted transcript section. */
+  driveDocUrl?: string | null;
 }): string {
   void args.iframeToken; // intentionally unused in the plain-text path
   const parts: string[] = [];
@@ -567,7 +590,12 @@ function buildSubmissionBodyText(args: {
     }
   }
 
-  if (args.pasteFallback.trim().length > 0) {
+  if (args.driveDocUrl) {
+    // M7.3 — Drive link replaces the inline pasted transcript.
+    parts.push("");
+    parts.push("");
+    parts.push(`📄 View full AI conversation (Drive): ${args.driveDocUrl}`);
+  } else if (args.pasteFallback.trim().length > 0) {
     parts.push("");
     parts.push("");
     parts.push(sectionHeader("AI conversation (pasted)"));

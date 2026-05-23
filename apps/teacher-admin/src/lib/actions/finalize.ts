@@ -6,6 +6,11 @@ import { resolveIframeToken } from "@/lib/iframe/resolve";
 import { submitReflectionToCanvas } from "@/lib/finalize/canvas-submit";
 import { notifySuperGrader } from "@/lib/finalize/super-grader";
 import { isAssignmentInSuperGraderScope } from "@/lib/super-grader/scope";
+import {
+  saveReflectionToDrive,
+  type AiChat,
+  type ReflectionMessage,
+} from "@/lib/google/save-reflection";
 
 export type FinalizeReflectionInput = {
   iframeToken: string;
@@ -124,6 +129,58 @@ export async function finalizeReflection(
   }
 
   const summaryGenerated = session.objective_summary !== null;
+
+  // M7.3 — auto-save the full reflection (objective summary + Q/A +
+  // pasted transcript) to the teacher's Drive folder. Runs BEFORE
+  // Canvas submission so the Canvas body can carry the Drive link in
+  // place of the inline pasted transcript. Best-effort: a Drive
+  // failure (missing token, quota, network) is logged but never blocks
+  // Canvas write or the webhook. Idempotent via drive_doc_url sentinel.
+  //
+  // Gated by post_to_drive_at_session (Phase 1 snapshot) — defaults
+  // true so AID matches the M7 "Drive is non-optional" invariant; a
+  // teacher who flipped post_to_drive=false on their assignment has
+  // that intent persisted on session creation and we honor it here.
+  let driveDocUrl: string | null = session.drive_doc_url ?? null;
+  const postToDrive =
+    session.post_to_drive_at_session ?? ctx.teacherAssignment.post_to_drive;
+  if (!driveDocUrl && postToDrive) {
+    try {
+      const refs = await saveReflectionToDrive({
+        id: session.id,
+        teacher_id: teacher.id,
+        student_id: student.id,
+        canvas_assignment_id: ctx.teacherAssignment.canvas_assignment_id,
+        first_draft: session.first_draft,
+        objective_summary: session.objective_summary,
+        reflection_messages:
+          (session.reflection_messages as ReflectionMessage[] | null) ?? [],
+        ai_chats: (session.ai_chats as AiChat[] | null) ?? [],
+        paste_fallback_text: session.paste_fallback_text,
+        completed_at: session.completed_at,
+        created_at: session.created_at,
+      });
+      driveDocUrl = refs.doc.webViewLink;
+      await admin
+        .from("reflection_sessions")
+        .update({
+          drive_doc_id: refs.doc.id,
+          drive_doc_url: refs.doc.webViewLink,
+        })
+        .eq("id", session.id);
+      // Mutate the in-memory row so downstream consumers (canvas-submit
+      // body builder, super-grader envelope) see the Drive URL on this
+      // turn without a re-fetch.
+      session.drive_doc_id = refs.doc.id;
+      session.drive_doc_url = refs.doc.webViewLink;
+    } catch (err) {
+      console.error(
+        `[finalize] Drive save failed for session ${session.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
 
   // 3.5. Ask super-grader if it's tracking this assignment. When in scope,
   //      super-grader owns the final Canvas post — we skip our own Canvas
