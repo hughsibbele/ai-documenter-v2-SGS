@@ -11,13 +11,31 @@ export async function GET(request: NextRequest) {
   const callbackUrl = new URL("/auth/callback", request.nextUrl.origin);
   callbackUrl.searchParams.set("next", next);
 
+  // M7.3 — request Drive + Docs scopes so the post-reflection Drive
+  // save can write per-teacher docs without a second consent prompt.
+  // `prompt=consent + access_type=offline` is REQUIRED here (not just
+  // select_account): refresh tokens are only returned on first
+  // consent. The shared OAuth client across the suite means a teacher
+  // who granted these scopes in HH/OE will see Google auto-consent
+  // here — that's intentional. M5 consolidation will harmonize the
+  // scope list across all four satellites.
+  const SCOPES = [
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "openid",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/documents",
+  ].join(" ");
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: callbackUrl.toString(),
+      scopes: SCOPES,
       queryParams: {
         hd: "episcopalhighschool.org",
-        prompt: "select_account",
+        prompt: "consent",
+        access_type: "offline",
       },
     },
   });

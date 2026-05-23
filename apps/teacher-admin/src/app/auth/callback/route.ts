@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { encryptSecret } from "@ai-documenter/crypto";
 import { createAdminDbClient } from "@ai-documenter/db/admin";
 import { getServerDbClient } from "@/lib/supabase/server";
 import { upsertStudentFromAuth } from "@/lib/auth/student";
@@ -16,13 +17,14 @@ export async function GET(request: NextRequest) {
   if (!code) return redirectWithError(request, "missing_code", next);
 
   const supabase = await getServerDbClient();
-  const { error: exchangeError } =
+  const { data: exchanged, error: exchangeError } =
     await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError) {
     return redirectWithError(request, exchangeError.message, next);
   }
 
+  const session = exchanged.session;
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -59,6 +61,46 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Service-role upsert: teachers has no INSERT policy by design.
+      // M7.3 — capture the Google provider tokens too so server-side
+      // Drive writes can fire without re-prompting the teacher.
+      // Refresh_token is only returned on first consent (login route
+      // sets prompt=consent + access_type=offline to force it). The
+      // Google access_token's lifetime is ~1h; we conservatively
+      // record expires_at at 55 min so the refresh helper triggers
+      // before the boundary.
+      const providerToken = session?.provider_token ?? null;
+      const providerRefreshToken = session?.provider_refresh_token ?? null;
+      const tokenExpiresAt = providerToken
+        ? new Date(Date.now() + 55 * 60 * 1000).toISOString()
+        : null;
+
+      const tokenUpdates: Record<string, string | null> = {};
+      if (providerToken) {
+        const key = process.env.TEACHER_GTOKEN_ENC_KEY;
+        if (!key) {
+          // Fail loud — silent plaintext fallback would re-open the
+          // at-rest leak this column shape exists to close.
+          return redirectWithError(
+            request,
+            "TEACHER_GTOKEN_ENC_KEY not configured",
+            next,
+          );
+        }
+        tokenUpdates.google_access_token_encrypted = encryptSecret(
+          providerToken,
+          key,
+        );
+        if (tokenExpiresAt) {
+          tokenUpdates.google_token_expires_at = tokenExpiresAt;
+        }
+        if (providerRefreshToken) {
+          tokenUpdates.google_refresh_token_encrypted = encryptSecret(
+            providerRefreshToken,
+            key,
+          );
+        }
+      }
+
       const admin = createAdminDbClient();
       const { error: upsertError } = await admin
         .from("teachers")
@@ -68,6 +110,7 @@ export async function GET(request: NextRequest) {
             email,
             display_name: displayName,
             google_sub: googleSub,
+            ...tokenUpdates,
           },
           { onConflict: "auth_user_id" },
         )

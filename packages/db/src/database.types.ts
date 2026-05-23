@@ -392,6 +392,8 @@ export type Database = {
           completed_at: string | null
           completion_code: string
           created_at: string
+          drive_doc_id: string | null
+          drive_doc_url: string | null
           expires_at: string
           first_draft: string | null
           id: string
@@ -419,6 +421,8 @@ export type Database = {
           completed_at?: string | null
           completion_code: string
           created_at?: string
+          drive_doc_id?: string | null
+          drive_doc_url?: string | null
           expires_at?: string
           first_draft?: string | null
           id?: string
@@ -446,6 +450,8 @@ export type Database = {
           completed_at?: string | null
           completion_code?: string
           created_at?: string
+          drive_doc_id?: string | null
+          drive_doc_url?: string | null
           expires_at?: string
           first_draft?: string | null
           id?: string
@@ -619,6 +625,7 @@ export type Database = {
       teachers: {
         Row: {
           auth_user_id: string
+          canvas_comment_enabled: boolean
           canvas_host: string | null
           canvas_token_encrypted: string | null
           card_body: string | null
@@ -628,15 +635,20 @@ export type Database = {
           card_title: string | null
           created_at: string
           display_name: string
+          drive_folder_id: string | null
           email: string
           gemini_daily_cap: number | null
+          google_access_token_encrypted: string | null
+          google_refresh_token_encrypted: string | null
           google_sub: string | null
+          google_token_expires_at: string | null
           id: string
           last_canvas_sync_at: string | null
           updated_at: string
         }
         Insert: {
           auth_user_id: string
+          canvas_comment_enabled?: boolean
           canvas_host?: string | null
           canvas_token_encrypted?: string | null
           card_body?: string | null
@@ -646,15 +658,20 @@ export type Database = {
           card_title?: string | null
           created_at?: string
           display_name: string
+          drive_folder_id?: string | null
           email: string
           gemini_daily_cap?: number | null
+          google_access_token_encrypted?: string | null
+          google_refresh_token_encrypted?: string | null
           google_sub?: string | null
+          google_token_expires_at?: string | null
           id?: string
           last_canvas_sync_at?: string | null
           updated_at?: string
         }
         Update: {
           auth_user_id?: string
+          canvas_comment_enabled?: boolean
           canvas_host?: string | null
           canvas_token_encrypted?: string | null
           card_body?: string | null
@@ -664,9 +681,13 @@ export type Database = {
           card_title?: string | null
           created_at?: string
           display_name?: string
+          drive_folder_id?: string | null
           email?: string
           gemini_daily_cap?: number | null
+          google_access_token_encrypted?: string | null
+          google_refresh_token_encrypted?: string | null
           google_sub?: string | null
+          google_token_expires_at?: string | null
           id?: string
           last_canvas_sync_at?: string | null
           updated_at?: string
