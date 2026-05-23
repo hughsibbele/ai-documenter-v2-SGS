@@ -19,6 +19,17 @@ export default async function SetupPage() {
   const appBaseUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
 
+  // M7.2 — AID's Google OAuth tokens land encrypted (M7.3 scaffolding).
+  // Drive scopes are requested at sign-in (auth/login route). A teacher
+  // shows as connected once both encrypted tokens are present.
+  const driveConnected = Boolean(
+    teacher.google_access_token_encrypted &&
+      teacher.google_refresh_token_encrypted,
+  );
+  const driveFolderUrl = teacher.drive_folder_id
+    ? `https://drive.google.com/drive/folders/${teacher.drive_folder_id}`
+    : null;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -83,6 +94,81 @@ export default async function SetupPage() {
           </li>
         </ol>
         <ConnectForm />
+      </div>
+
+      {/* M7.2 — Google Drive section. Drive ownership is per-teacher; */}
+      {/* every finalized reflection auto-saves a Doc into the teacher's */}
+      {/* "AI Documenter" folder (M7.3). */}
+      <div className="rounded-md border border-stone-200 bg-white p-5 text-sm">
+        <h2 className="mb-2 text-sm font-semibold text-stone-900">
+          Google Drive
+        </h2>
+        <p className="mb-3 text-xs text-stone-600">
+          Per-teacher OAuth. Drive scopes are requested when you sign in
+          with Google. Every finalized reflection auto-creates a Google
+          Doc in a per-teacher{" "}
+          <strong>AI Documenter</strong> folder; the Canvas comment or
+          body carries a link to it in place of the inline transcript.
+        </p>
+        <dl className="mb-3 grid grid-cols-[8rem_1fr] gap-y-1 text-xs">
+          <dt className="text-stone-500">Status</dt>
+          <dd>
+            {driveConnected ? (
+              <span className="text-emerald-800">
+                ✓ Connected for {teacher.display_name}
+              </span>
+            ) : (
+              <span className="text-amber-700">
+                Not connected — sign out and back in with Google to grant
+                Drive scopes.
+              </span>
+            )}
+          </dd>
+          {driveConnected && (
+            <>
+              <dt className="text-stone-500">App folder</dt>
+              <dd>
+                {driveFolderUrl ? (
+                  <a
+                    href={driveFolderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-stone-900 underline-offset-2 hover:underline"
+                  >
+                    Open &ldquo;AI Documenter&rdquo; in Drive ↗
+                  </a>
+                ) : (
+                  <span className="italic text-stone-500">
+                    Auto-created on your first reflection.
+                  </span>
+                )}
+              </dd>
+              {teacher.google_token_expires_at && (
+                <>
+                  <dt className="text-stone-500">Access token expires</dt>
+                  <dd className="text-stone-700">
+                    {new Date(
+                      teacher.google_token_expires_at,
+                    ).toLocaleString()}{" "}
+                    <span className="text-stone-500">
+                      (auto-refreshed when within 5 min of expiry)
+                    </span>
+                  </dd>
+                </>
+              )}
+            </>
+          )}
+        </dl>
+        {!driveConnected && (
+          <form action="/auth/logout" method="post">
+            <button
+              type="submit"
+              className="rounded border border-stone-400 px-3 py-1.5 text-xs font-medium text-stone-900 transition-colors hover:bg-stone-900 hover:text-white"
+            >
+              Sign out to reconnect
+            </button>
+          </form>
+        )}
       </div>
 
       <CardTextEditor
