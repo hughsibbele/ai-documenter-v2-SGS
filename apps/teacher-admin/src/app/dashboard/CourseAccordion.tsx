@@ -265,6 +265,17 @@ function AssignmentRow({
               </Link>
             </>
           )}
+          {isInstalled && assignment.promptId && (
+            <>
+              {" · "}
+              <Link
+                href={`/dashboard/prompts/${assignment.promptId}/preview`}
+                className="text-dark-blue underline-offset-2 hover:underline"
+              >
+                Preview as student
+              </Link>
+            </>
+          )}
         </div>
       </div>
       {assignment.inSuperGraderScope && <SuperGraderBadge />}

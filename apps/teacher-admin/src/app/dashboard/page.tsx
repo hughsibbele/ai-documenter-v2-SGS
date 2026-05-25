@@ -158,6 +158,7 @@ async function CourseList({
             ...a,
             install: installByAssignmentId.get(a.canvas_assignment_id) ?? null,
             promptLabel: promptId ? promptLabelById.get(promptId) ?? null : null,
+            promptId: promptId ?? null,
             reflectionCount:
               reflectionCounts.get(a.canvas_assignment_id) ?? 0,
             destination:

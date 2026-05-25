@@ -120,7 +120,9 @@ export async function finalizeReflection(
 
   // M7.11 — preview mode: skip all side effects (Drive, Canvas, SG webhook).
   // Just flip state to submitted so the completion screen renders.
-  if (session.is_preview) {
+  // Cast: is_preview column added by migration 20260525130000 but types
+  // aren't regenerated until the migration is applied.
+  if ((session as unknown as { is_preview?: boolean }).is_preview) {
     await admin
       .from("reflection_sessions")
       .update({
