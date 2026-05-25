@@ -110,6 +110,15 @@ export default async function SetupPage() {
           <strong>AI Documenter</strong> folder; the Canvas comment or
           body carries a link to it in place of the inline transcript.
         </p>
+        <p className="mb-3 text-xs text-stone-600">
+          <strong>Want everything in a shared folder?</strong> Drag the{" "}
+          <strong>AI Documenter</strong> folder anywhere in your Drive —
+          into a shared course folder, into a subfolder, or rename it.
+          Future reflections will keep landing in the same folder; the
+          link stays valid. If you trash it, a fresh one is auto-created
+          in your Drive root on the next reflection (and you can move
+          that one too).
+        </p>
         <dl className="mb-3 grid grid-cols-[8rem_1fr] gap-y-1 text-xs">
           <dt className="text-stone-500">Status</dt>
           <dd>
