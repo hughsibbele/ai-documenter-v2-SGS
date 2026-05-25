@@ -1,7 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerDbClient } from "@/lib/supabase/server";
-import { BrandHeader } from "@/components/brand/BrandHeader";
 
 const ERROR_MESSAGES: Record<string, string> = {
   domain_not_allowed:
@@ -11,103 +12,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   oauth_init_failed:
     "Couldn't start the Google sign-in. Please try again in a moment.",
 };
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ auth_error?: string; next?: string }>;
-}) {
-  const supabase = await getServerDbClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) redirect("/dashboard");
-
-  const { auth_error, next } = await searchParams;
-  const errorMessage =
-    auth_error && (ERROR_MESSAGES[auth_error] ?? `Sign-in failed: ${auth_error}`);
-
-  const loginHref = next
-    ? `/auth/login?next=${encodeURIComponent(next)}`
-    : "/auth/login";
-
-  return (
-    <div className="flex min-h-dvh flex-col bg-paper">
-      <BrandHeader eyebrow="AI Documenter" />
-
-      <main className="flex-1 px-6 py-16">
-        <article className="mx-auto w-full max-w-2xl space-y-10">
-          <header className="space-y-4">
-            <div className="ehs-eyebrow text-maroon">For teachers</div>
-            <h1 className="text-4xl leading-[1.15] text-ink">
-              Install AI-use reflections on your Canvas assignments.
-            </h1>
-            <p className="text-base leading-relaxed text-cool-gray">
-              Pick a Canvas course, pick the assignments you want to enable,
-              and we&rsquo;ll add a branded reflection card to each
-              assignment&rsquo;s description. Students click through to a short
-              Socratic reflection that submits back to Canvas automatically.
-            </p>
-          </header>
-
-          <hr className="ehs-rule" />
-
-          <section className="space-y-3">
-            <div className="ehs-eyebrow text-cool-gray">Setup &mdash; once</div>
-            <ol className="space-y-2.5 text-sm leading-relaxed text-ink">
-              <li className="flex gap-3">
-                <span className="text-maroon">i.</span>
-                <span>
-                  Sign in with your @episcopalhighschool.org Google account.
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-maroon">ii.</span>
-                <span>
-                  Paste a Canvas API token (we&rsquo;ll show you where to get
-                  one).
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-maroon">iii.</span>
-                <span>
-                  Pick a reflection prompt &mdash; the school default works, or
-                  write your own.
-                </span>
-              </li>
-            </ol>
-          </section>
-
-          {errorMessage && (
-            <div
-              role="alert"
-              className="rounded-sm border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <div className="space-y-2 pt-2">
-            <Link
-              href={loginHref}
-              className="inline-flex w-full items-center justify-center gap-2.5 rounded-sm bg-maroon px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-maroon-dark"
-            >
-              <GoogleMark />
-              Sign in with EHS Google
-            </Link>
-            <p className="text-center text-xs italic text-cool-gray">
-              EHS Workspace accounts only.
-            </p>
-          </div>
-        </article>
-      </main>
-
-      <footer className="px-6 py-6 text-center text-xs italic text-cool-gray">
-        AI Documenter &middot; Episcopal High School
-      </footer>
-    </div>
-  );
-}
 
 function GoogleMark() {
   return (
@@ -135,5 +39,65 @@ function GoogleMark() {
         d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.08 2.3A5.27 5.27 0 0 1 9 3.58z"
       />
     </svg>
+  );
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ auth_error?: string; next?: string }>;
+}) {
+  const supabase = await getServerDbClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) redirect("/dashboard");
+
+  const { auth_error, next } = await searchParams;
+  const errorMessage =
+    auth_error && (ERROR_MESSAGES[auth_error] ?? `Sign-in failed: ${auth_error}`);
+
+  const loginHref = next
+    ? `/auth/login?next=${encodeURIComponent(next)}`
+    : "/auth/login";
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-paper p-4">
+      <div className="w-full max-w-md space-y-6 rounded-xl bg-white px-8 py-10 shadow-sm ring-1 ring-ink/10">
+        <div className="space-y-3 text-center">
+          <img
+            src="/brand/ehs-horizontal.webp"
+            alt="Episcopal High School"
+            className="mx-auto h-12 w-auto"
+          />
+          <h1 className="text-2xl text-ink">AI Documenter</h1>
+          <p className="text-sm text-cool-gray">
+            Install AI-use reflections on your Canvas assignments.
+          </p>
+        </div>
+
+        {errorMessage && (
+          <div
+            role="alert"
+            className="rounded-sm border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+          >
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <Link
+            href={loginHref}
+            className="inline-flex w-full items-center justify-center gap-2.5 rounded-sm bg-maroon px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-maroon-dark"
+          >
+            <GoogleMark />
+            Sign in with EHS Google
+          </Link>
+          <p className="text-center text-xs italic text-cool-gray">
+            EHS Workspace accounts only.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
