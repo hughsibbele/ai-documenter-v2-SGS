@@ -24,7 +24,7 @@ export function PreviewCompletionLabel() {
     <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-medium">Preview output</p>
       <p className="mt-1 text-xs">
-        This is what the student sees, and what you'd see when grading. No
+        This is what the student sees, and what you&apos;d see when grading. No
         data was sent to Canvas, Drive, or super-grader.
       </p>
     </div>

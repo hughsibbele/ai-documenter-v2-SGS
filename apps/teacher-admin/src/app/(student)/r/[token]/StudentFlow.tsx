@@ -76,6 +76,7 @@ export default function StudentFlow({
   initialAuthError,
 }: Props) {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
+  const sessionFetched = useRef(false);
 
   const refreshSession = useCallback(async () => {
     const info = await getStudentSession({ iframeToken });
@@ -93,8 +94,23 @@ export default function StudentFlow({
   }, [iframeToken]);
 
   useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
+    if (sessionFetched.current) return;
+    sessionFetched.current = true;
+    (async () => {
+      const info = await getStudentSession({ iframeToken });
+      if (!info.signedIn) {
+        setAuth({ kind: "anon" });
+        return;
+      }
+      setAuth({
+        kind: "signed-in",
+        displayName: info.displayName ?? "you",
+        hasActiveReflection: info.hasActiveReflection,
+        firstDraft: info.firstDraft,
+        objectiveSummary: info.objectiveSummary,
+      });
+    })();
+  }, [iframeToken]);
 
   if (!ctxValid) return <BrokenLink />;
 
@@ -305,7 +321,6 @@ function SignedInFlow({
   return (
     <ConversationScreen
       iframeToken={iframeToken}
-      studentFacingQuestion={studentFacingQuestion}
       firstDraft={firstDraft ?? ""}
       initialObjectiveSummary={objectiveSummary}
     />
@@ -512,12 +527,10 @@ function IntakeScreen({
 
 function ConversationScreen({
   iframeToken,
-  studentFacingQuestion,
   firstDraft,
   initialObjectiveSummary,
 }: {
   iframeToken: string;
-  studentFacingQuestion: string;
   firstDraft: string;
   initialObjectiveSummary: string | null;
 }) {
