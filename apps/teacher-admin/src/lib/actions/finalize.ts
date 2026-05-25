@@ -118,6 +118,28 @@ export async function finalizeReflection(
     };
   }
 
+  // M7.11 — preview mode: skip all side effects (Drive, Canvas, SG webhook).
+  // Just flip state to submitted so the completion screen renders.
+  if (session.is_preview) {
+    await admin
+      .from("reflection_sessions")
+      .update({
+        state: "submitted",
+        submitted_at: new Date().toISOString(),
+      })
+      .eq("id", session.id)
+      .eq("state", "completed");
+    return {
+      ok: true,
+      canvasSubmitted: false,
+      routedViaSuperGrader: false,
+      completionCode: session.completion_code,
+      canvasError: null,
+      summaryGenerated: session.objective_summary !== null,
+      webhookDelivered: false,
+    };
+  }
+
   // 3. Load the teacher (canvas token + host live there).
   const { data: teacher } = await admin
     .from("teachers")

@@ -30,3 +30,21 @@ export const getCurrentTeacher = cache(async (): Promise<Teacher> => {
 
   return teacher;
 });
+
+export const tryGetCurrentTeacher = cache(
+  async (): Promise<Teacher | null> => {
+    const supabase = await getServerDbClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("*")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    return teacher ?? null;
+  },
+);
