@@ -14,7 +14,7 @@
     "@ai-documenter/crypto": "workspace:*",
     "@ai-documenter/db": "workspace:*",
     "@ai-documenter/gemini": "workspace:*",
-    "@sentry/nextjs": "^10.53.0",
+    "@sentry/nextjs": "^10.53.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.102.1",
     "googleapis": "^171.4.0",
