@@ -141,6 +141,12 @@ function buildEnvelope(
       socratic_messages:
         (session.reflection_messages as SocraticMessage[] | null) ?? [],
       objective_summary: session.objective_summary,
+      // M7.9 — Drive doc link (M7.3 sets drive_doc_url on the session
+      // row when save-to-drive lands). Optional — older sessions that
+      // pre-date M7.3 or sessions whose Drive save failed send null.
+      // SG's validator scheme-checks google_doc_url for http(s) and
+      // SG's AiUseCard renders it as a "[ drive doc → ]" link.
+      google_doc_url: session.drive_doc_url ?? null,
     },
     links: { detail_url: detailUrl },
   };
