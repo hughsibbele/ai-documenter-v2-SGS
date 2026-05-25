@@ -65,7 +65,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
-      <BrandHeader logoHref="/dashboard" right={nav} />
+      <BrandHeader title="AI Documenter" logoHref="/dashboard" right={nav} />
 
       <main className="flex-1 px-6 py-8">{children}</main>
 

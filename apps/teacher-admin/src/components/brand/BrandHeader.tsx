@@ -1,70 +1,52 @@
-// Shared page header used across student + dashboard + admin surfaces.
-//
-// Editorial layout — logo on the left, hairline maroon rule below, optional
-// small-caps eyebrow + title + italic subtitle on the right. Logo is the
-// canonical EHS horizontal mark from /public/brand. Never alter colors or
-// proportions per the style guide.
-
-/* eslint-disable @next/next/no-img-element -- /public asset, no Next image
- * optimization needed and the actual pixel dimensions vary by render context. */
-
 import Link from "next/link";
 
 type Props = {
-  /** Small-caps line above the title. e.g. "AI Use Reflection". */
-  eyebrow?: string;
-  /** Main title in body weight. e.g. an assignment name. */
+  /** App name displayed as the header's main visual anchor. */
   title?: string;
-  /** Italic subtitle below the title. e.g. course name. */
+  /** Small-caps line below the title. e.g. "Teacher" or "Admin". */
+  eyebrow?: string;
+  /** Italic subtitle below the eyebrow. e.g. course name. */
   subtitle?: string;
-  /** Optional right-side slot (sign-out button, admin badge, etc). */
+  /** Optional right-side slot (nav links, sign-out button, etc). */
   right?: React.ReactNode;
-  /** When provided, makes the logo a link back to this path. Don't wrap the
-   * whole header — `right` is typically a `<nav>` with its own anchors, and
-   * nested `<a>` tags are invalid HTML. */
+  /** When provided, makes the title a link back to this path. */
   logoHref?: string;
   /** Replaces the default light-blue hairline rule below the header with a
-   * different color class. Use "ehs-rule-maroon" for emphasis or a custom
-   * Tailwind class string (e.g. "h-0.5 bg-dark-blue") for an admin accent. */
+   * different color class. e.g. "h-0.5 border-0 bg-dark-blue" for admin. */
   ruleClassName?: string;
 };
 
 export function BrandHeader({
-  eyebrow,
   title,
+  eyebrow,
   subtitle,
   right,
   logoHref,
   ruleClassName,
 }: Props) {
-  const logo = (
-    <img
-      src="/brand/ehs-horizontal.webp"
-      alt="Episcopal High School"
-      className="h-11 w-auto shrink-0"
-    />
-  );
+  const heading = title ? (
+    <span className="font-display text-xl font-semibold italic">
+      <span className="text-maroon">EHS</span>{" "}
+      <span className="text-ink">{title}</span>
+    </span>
+  ) : null;
+
   return (
     <header className="bg-white">
-      <div className="mx-auto flex w-full max-w-5xl items-end justify-between gap-6 px-6 pt-6 pb-4">
-        <div className="flex items-end gap-5 min-w-0">
-          {logoHref ? (
-            <Link href={logoHref} aria-label="Home" className="shrink-0">
-              {logo}
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-6 px-6 pt-5 pb-4">
+        <div className="flex items-baseline gap-4 min-w-0">
+          {logoHref && heading ? (
+            <Link href={logoHref} className="shrink-0">
+              {heading}
             </Link>
           ) : (
-            logo
+            heading
           )}
-          {(eyebrow || title || subtitle) && (
-            <div className="hidden min-w-0 pb-1 sm:block">
+          {(eyebrow || subtitle) && (
+            <div className="hidden min-w-0 sm:block">
               {eyebrow && (
                 <div className="ehs-eyebrow truncate whitespace-nowrap">
                   {eyebrow}
-                </div>
-              )}
-              {title && (
-                <div className="mt-0.5 truncate text-base text-ink">
-                  {title}
                 </div>
               )}
               {subtitle && (
@@ -75,10 +57,6 @@ export function BrandHeader({
             </div>
           )}
         </div>
-        {/* min-w-0 lets the slot compress when a wide nav would otherwise
-            overflow into the logo column. The nav inside is responsible for
-            its own flex-wrap behavior so items reflow onto multiple lines
-            rather than truncate. */}
         {right && <div className="min-w-0 self-center">{right}</div>}
       </div>
       <hr className={ruleClassName ?? "ehs-rule"} />

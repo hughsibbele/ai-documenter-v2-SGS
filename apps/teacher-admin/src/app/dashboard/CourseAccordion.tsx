@@ -102,22 +102,19 @@ export function CourseAccordion({
         <div className="flex min-w-0 items-center gap-2">
           <Chevron open={open} />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-stone-900">
+            <div className="truncate text-sm text-ink">
+              {course.course_code && (
+                <span className="mr-2 font-semibold text-maroon">{course.course_code}</span>
+              )}
               {course.name}
               {isInactive && (
-                <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-stone-400">
+                <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-cool-gray">
                   {course.workflow_state}
                 </span>
               )}
             </div>
-            <div className="mt-0.5 truncate text-[11px] text-stone-500">
+            <div className="mt-0.5 truncate text-[11px] text-cool-gray">
               {course.term_name ?? "No term"}
-              {course.course_code && (
-                <>
-                  {" · "}
-                  <span className="font-mono">{course.course_code}</span>
-                </>
-              )}
             </div>
           </div>
         </div>

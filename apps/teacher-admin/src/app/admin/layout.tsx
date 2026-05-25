@@ -69,6 +69,7 @@ export default async function AdminLayout({
       {/* Dark-blue rule distinguishes admin from the teacher dashboard while
           staying inside the EHS palette (style guide accent). */}
       <BrandHeader
+        title="AI Documenter"
         logoHref="/admin"
         ruleClassName="h-0.5 border-0 bg-dark-blue"
         right={nav}

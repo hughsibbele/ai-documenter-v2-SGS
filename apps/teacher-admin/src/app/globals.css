@@ -16,7 +16,7 @@
   /* Display (headings) + body both Lora-first. Loaded via next/font/google
    * in the root layout under --font-lora; Georgia is the web-safe fallback. */
   --font-display: var(--font-lora), Georgia, "Times New Roman", serif;
-  --font-body: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-geist-sans), system-ui, sans-serif;
   /* Reserved for "official document" surfaces (the static prompt block, the
    * locked first draft) — explicit Georgia gives those a distinct, slightly
    * heavier, traditional feel against the Lora-running body. */

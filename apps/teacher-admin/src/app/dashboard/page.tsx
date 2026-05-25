@@ -25,7 +25,7 @@ export default async function DashboardHome() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Your courses</h1>
+        <h1 className="text-xl font-medium text-ink">Your courses</h1>
         <RefreshWidget
           lastSyncedAt={teacher.last_canvas_sync_at}
         />
@@ -270,12 +270,12 @@ function OtherCoursesSection({
                   key={g.course.canvas_course_id}
                   className="truncate text-xs text-stone-600"
                 >
-                  {g.course.name}
                   {g.course.course_code && (
-                    <span className="ml-1.5 font-mono text-stone-400">
-                      ({g.course.course_code})
+                    <span className="mr-1.5 font-semibold text-maroon">
+                      {g.course.course_code}
                     </span>
                   )}
+                  {g.course.name}
                 </li>
               ))}
             </ul>

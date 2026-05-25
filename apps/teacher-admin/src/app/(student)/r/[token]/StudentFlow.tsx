@@ -167,12 +167,13 @@ function Shell({
   subtitle: string | null;
   children: React.ReactNode;
 }) {
+  const context = [title, subtitle].filter(Boolean).join(" · ") || undefined;
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
       <BrandHeader
+        title="AI Documenter"
         eyebrow={eyebrow}
-        title={title ?? undefined}
-        subtitle={subtitle ?? undefined}
+        subtitle={context}
         right={<TeacherCornerLink />}
       />
       <main className="flex-1 px-6 py-10">{children}</main>
@@ -184,7 +185,7 @@ function BrokenLink() {
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
       <BrandHeader
-        eyebrow="AI Use Reflection"
+        title="AI Documenter"
         right={<TeacherCornerLink />}
       />
       <main className="flex flex-1 items-center justify-center px-6 py-12">
