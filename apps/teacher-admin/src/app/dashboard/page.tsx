@@ -8,6 +8,7 @@ import { loadReflectionCountsByAssignment } from "@/lib/reviews/load";
 import { refreshCanvas } from "@/lib/actions/canvas-sync";
 import { CourseAccordion } from "./CourseAccordion";
 import { RefreshButton, SyncIndicator } from "./RefreshButton";
+import { TeacherGuide } from "./TeacherGuide";
 import { bulkSuperGraderScope } from "@/lib/super-grader/scope";
 import type {
   AssignmentWithInstall,
@@ -25,7 +26,10 @@ export default async function DashboardHome() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-medium text-ink">Your courses</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-medium text-ink">Your courses</h1>
+          <TeacherGuide />
+        </div>
         <RefreshWidget
           lastSyncedAt={teacher.last_canvas_sync_at}
         />
