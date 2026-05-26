@@ -55,26 +55,11 @@ export function CourseAccordion({
     return assignments.filter((a) => a.name.toLowerCase().includes(q));
   }, [assignments, search]);
 
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((a) => selected.has(a.canvas_assignment_id));
-
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAllFiltered() {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (allFilteredSelected) {
-        for (const a of filtered) next.delete(a.canvas_assignment_id);
-      } else {
-        for (const a of filtered) next.add(a.canvas_assignment_id);
-      }
       return next;
     });
   }
@@ -159,16 +144,6 @@ export function CourseAccordion({
                     ? `${assignments.length} total`
                     : `${filtered.length} of ${assignments.length}`}
                 </span>
-                <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-[11px] text-stone-600">
-                  <input
-                    type="checkbox"
-                    checked={allFilteredSelected}
-                    onChange={toggleAllFiltered}
-                    disabled={filtered.length === 0}
-                    className="h-3.5 w-3.5"
-                  />
-                  Select all visible
-                </label>
               </div>
 
               {filtered.length === 0 ? (
