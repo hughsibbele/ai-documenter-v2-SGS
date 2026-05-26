@@ -145,6 +145,7 @@ export type Database = {
           end_at: string | null
           last_synced_at: string
           name: string
+          short_name: string | null
           start_at: string | null
           teacher_id: string
           term_end_at: string | null
@@ -158,6 +159,7 @@ export type Database = {
           end_at?: string | null
           last_synced_at?: string
           name: string
+          short_name?: string | null
           start_at?: string | null
           teacher_id: string
           term_end_at?: string | null
@@ -171,6 +173,7 @@ export type Database = {
           end_at?: string | null
           last_synced_at?: string
           name?: string
+          short_name?: string | null
           start_at?: string | null
           teacher_id?: string
           term_end_at?: string | null

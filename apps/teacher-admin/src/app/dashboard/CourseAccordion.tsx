@@ -2,11 +2,15 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   installOnAssignments,
   uninstallFromAssignments,
 } from "@/lib/actions/canvas-install";
-import { setCourseAutoInstall } from "@/lib/actions/course-policy";
+import {
+  setCourseAutoInstall,
+  updateCourseNickname,
+} from "@/lib/actions/course-policy";
 import type { InstallActionResult } from "@/lib/actions/canvas-install.types";
 import type {
   AssignmentWithInstall,
@@ -41,6 +45,7 @@ export function CourseAccordion({
   promptOptions: PromptOption[];
 }) {
   const { course, assignments, autoInstall, installedCount } = group;
+  const router = useRouter();
 
   const [open, setOpen] = useSessionFlag(
     `dashboard:course-${course.canvas_course_id}:open`,
@@ -48,6 +53,8 @@ export function CourseAccordion({
   );
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknamePending, startNicknameTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -66,6 +73,14 @@ export function CourseAccordion({
 
   function clearSelection() {
     setSelected(new Set());
+  }
+
+  function saveNickname(value: string) {
+    setEditingNickname(false);
+    startNicknameTransition(async () => {
+      await updateCourseNickname(course.canvas_course_id, value);
+      router.refresh();
+    });
   }
 
   const isInactive = course.workflow_state !== "available";
@@ -87,18 +102,65 @@ export function CourseAccordion({
         <div className="flex min-w-0 items-center gap-2">
           <Chevron open={open} />
           <div className="min-w-0">
-            <div className="truncate text-sm text-ink">
-              {course.course_code && (
-                <span className="mr-2 font-semibold text-maroon">{course.course_code}</span>
+            <div className="flex items-center truncate text-sm text-ink">
+              {editingNickname ? (
+                <span
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    autoFocus
+                    defaultValue={course.short_name ?? ""}
+                    placeholder="Short name…"
+                    onBlur={(e) => saveNickname(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveNickname(e.currentTarget.value);
+                      if (e.key === "Escape") setEditingNickname(false);
+                    }}
+                    className="mr-2 w-24 rounded border border-stone-300 px-1.5 py-0.5 text-xs focus:border-maroon focus:outline-none focus:ring-1 focus:ring-maroon"
+                  />
+                </span>
+              ) : (
+                <>
+                  {(course.short_name || course.course_code) && (
+                    <span className="mr-2 font-semibold text-maroon">
+                      {course.short_name ?? course.course_code}
+                    </span>
+                  )}
+                  {course.name}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingNickname(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        setEditingNickname(true);
+                      }
+                    }}
+                    className="ml-1.5 inline-flex shrink-0 items-center text-stone-400 hover:text-maroon"
+                    title="Edit short name"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                  </span>
+                </>
               )}
-              {course.name}
-              {isInactive && (
+              {!editingNickname && isInactive && (
                 <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-cool-gray">
                   {course.workflow_state}
                 </span>
               )}
+              {nicknamePending && (
+                <span className="ml-2 text-[10px] italic text-stone-400">saving…</span>
+              )}
             </div>
             <div className="mt-0.5 truncate text-[11px] text-cool-gray">
+              {course.short_name && course.course_code && (
+                <span className="mr-1.5">{course.course_code} ·</span>
+              )}
               {course.term_name ?? "No term"}
             </div>
           </div>

@@ -8,6 +8,8 @@ export type SetAutoInstallResult =
   | { ok: true; enabled: boolean }
   | { ok: false; message: string };
 
+export type UpdateNicknameResult = { ok: true } | { ok: false; error: string };
+
 /**
  * Persist the per-course auto-install toggle. Upserts
  * `course_install_policies.auto_install_new_assignments` for the (teacher,
@@ -82,4 +84,32 @@ export async function setCourseAutoInstall(
 
   revalidatePath("/dashboard");
   return { ok: true, enabled };
+}
+
+/**
+ * Set or clear a teacher-chosen nickname (short_name) for a course.
+ * Stored in `canvas_course_cache.short_name` — the sync upsert doesn't
+ * touch this column, so teacher-set values persist across syncs. Uses the
+ * admin client because `canvas_course_cache` has `REVOKE UPDATE FROM
+ * authenticated`.
+ */
+export async function updateCourseNickname(
+  canvasCourseId: string,
+  shortName: string,
+): Promise<UpdateNicknameResult> {
+  const teacher = await getCurrentTeacher();
+  const admin = createAdminDbClient();
+
+  const value = shortName.trim() || null; // empty string → clear
+
+  const { error } = await admin
+    .from("canvas_course_cache")
+    .update({ short_name: value })
+    .eq("teacher_id", teacher.id)
+    .eq("canvas_course_id", canvasCourseId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/dashboard");
+  return { ok: true };
 }
